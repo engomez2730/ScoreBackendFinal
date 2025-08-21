@@ -24,32 +24,16 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
-// Rutas de jugadores
-app.use("/players", playersRouter);
-
-// Rutas de equipos
-app.use("/teams", teamsRouter);
-
-// Rutas de eventos
-app.use("/events", eventsRouter);
-
-// Rutas de juegos
-app.use("/games", gamesRouter);
-
-// Rutas de estadísticas de jugadores por juego
-app.use("/player-game-stats", playerGameStatsRouter);
-
-// Rutas de sustituciones
-app.use("/substitutions", substitutionsRouter);
+// API Routes with /api prefix
+app.use("/api/players", playersRouter);
+app.use("/api/teams", teamsRouter);
+app.use("/api/events", eventsRouter);
+app.use("/api/games", gamesRouter);
+app.use("/api/player-game-stats", playerGameStatsRouter);
+app.use("/api/substitutions", substitutionsRouter);
 
 app.get("/", (req, res) => {
   res.send("Basketball Stats API running");
-});
-
-// Ejemplo de endpoint: obtener equipos
-app.get("/teams", async (req, res) => {
-  const teams = await prisma.team.findMany({ include: { players: true } });
-  res.json(teams);
 });
 
 // --- Lógica de control de tiempo y sincronización en tiempo real ---
