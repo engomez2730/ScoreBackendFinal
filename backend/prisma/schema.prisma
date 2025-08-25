@@ -88,6 +88,7 @@ model PlayerGameStats {
   tiros3Anotados   Int
   minutos          Int
   plusMinus        Int
+  perdidas         Int     @default(0)
   game             Game   @relation(fields: [gameId], references: [id])
   player           Player @relation(fields: [playerId], references: [id])
   
@@ -100,6 +101,7 @@ model Substitution {
   playerInId Int
   playerOutId Int
   timestamp  DateTime
+  gameTime   Int
   game       Game   @relation(fields: [gameId], references: [id])
   playerIn   Player @relation("PlayerIn", fields: [playerInId], references: [id])
   playerOut  Player @relation("PlayerOut", fields: [playerOutId], references: [id])

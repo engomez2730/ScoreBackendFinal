@@ -8,7 +8,7 @@ import cors from "cors";
 import { PrismaClient } from "@prisma/client";
 import playersRouter from "./routes/players.js";
 import teamsRouter from "./routes/teams.js";
-import eventsRouter from "./routes/events.js";
+import eventsRouter from "./routes/events.js";  
 
 const app = express();
 const server = http.createServer(app);
@@ -32,7 +32,7 @@ app.use("/api/games", gamesRouter);
 app.use("/api/player-game-stats", playerGameStatsRouter);
 app.use("/api/substitutions", substitutionsRouter);
 
-app.get("/", (req, res) => {
+app.get("/api", (req, res) => {
   res.send("Basketball Stats API running");
 });
 
