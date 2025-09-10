@@ -1,3 +1,46 @@
+export const fullUpdateGame = async (gameId, { homeScore, awayScore, currentQuarter, quarterTime, gameTime, playerStats }) => {
+  return prisma.$transaction(async (tx) => {
+    // Update game details
+    const updatedGame = await tx.game.update({
+      where: { id: Number(gameId) },
+      data: {
+        homeScore: Number(homeScore),
+        awayScore: Number(awayScore),
+        currentQuarter: Number(currentQuarter),
+        quarterTime: Number(quarterTime),
+        gameTime: Number(gameTime)
+      }
+    });
+
+    // Update player stats
+    let updatedStats = [];
+    if (Array.isArray(playerStats)) {
+      for (const stat of playerStats) {
+        const { playerId, ...rest } = stat;
+        const updated = await tx.playerGameStats.upsert({
+          where: {
+            gameId_playerId: {
+              gameId: Number(gameId),
+              playerId: Number(playerId)
+            }
+          },
+          update: rest,
+          create: {
+            gameId: Number(gameId),
+            playerId: Number(playerId),
+            ...rest
+          }
+        });
+        updatedStats.push(updated);
+      }
+    }
+
+    return {
+      game: updatedGame,
+      playerStats: updatedStats
+    };
+  });
+};
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 

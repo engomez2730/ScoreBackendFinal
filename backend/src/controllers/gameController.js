@@ -1,3 +1,20 @@
+export const fullUpdateGame = async (req, res) => {
+  try {
+    const gameId = req.params.id;
+    const { homeScore, awayScore, currentQuarter, quarterTime, gameTime, playerStats } = req.body;
+    const result = await gameService.fullUpdateGame(gameId, {
+      homeScore,
+      awayScore,
+      currentQuarter,
+      quarterTime,
+      gameTime,
+      playerStats
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
 import * as gameService from "../services/gameService.js";
 
 export const getGames = async (req, res) => {

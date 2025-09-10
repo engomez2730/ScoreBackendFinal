@@ -12,6 +12,7 @@ router.delete("/", gameController.deleteAllGames);
 router.put("/:id/time", gameController.updateGameTime);
 router.post("/:id/reset-time", gameController.resetGameTime);
 router.put("/:id/score", gameController.updateScore);
+router.put("/:id/full-update", gameController.fullUpdateGame);
 router.get("/:id/stats", gameController.getGameStats);
 router.put("/:id/player-stats", gameController.updatePlayerStats);
 router.get("/:id/active-players", gameController.getActivePlayers);
