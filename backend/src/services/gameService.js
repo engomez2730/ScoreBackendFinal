@@ -1,4 +1,7 @@
-export const fullUpdateGame = async (gameId, { homeScore, awayScore, currentQuarter, quarterTime, gameTime, playerStats }) => {
+export const fullUpdateGame = async (
+  gameId,
+  { homeScore, awayScore, currentQuarter, quarterTime, gameTime, playerStats }
+) => {
   return prisma.$transaction(async (tx) => {
     // Update game details
     const updatedGame = await tx.game.update({
@@ -8,8 +11,8 @@ export const fullUpdateGame = async (gameId, { homeScore, awayScore, currentQuar
         awayScore: Number(awayScore),
         currentQuarter: Number(currentQuarter),
         quarterTime: Number(quarterTime),
-        gameTime: Number(gameTime)
-      }
+        gameTime: Number(gameTime),
+      },
     });
 
     // Update player stats
@@ -21,15 +24,15 @@ export const fullUpdateGame = async (gameId, { homeScore, awayScore, currentQuar
           where: {
             gameId_playerId: {
               gameId: Number(gameId),
-              playerId: Number(playerId)
-            }
+              playerId: Number(playerId),
+            },
           },
           update: rest,
           create: {
             gameId: Number(gameId),
             playerId: Number(playerId),
-            ...rest
-          }
+            ...rest,
+          },
         });
         updatedStats.push(updated);
       }
@@ -37,7 +40,7 @@ export const fullUpdateGame = async (gameId, { homeScore, awayScore, currentQuar
 
     return {
       game: updatedGame,
-      playerStats: updatedStats
+      playerStats: updatedStats,
     };
   });
 };
@@ -75,7 +78,7 @@ export const createGame = async (data) => {
 
 export const checkTeamPlayers = async (teamId) => {
   const players = await prisma.player.count({
-    where: { teamId: Number(teamId) }
+    where: { teamId: Number(teamId) },
   });
   return players >= 10;
 };
@@ -86,12 +89,14 @@ export const updateGame = async (id, data) => {
     const game = await getGameById(id);
     const homeTeamValid = await checkTeamPlayers(game.teamHomeId);
     const awayTeamValid = await checkTeamPlayers(game.teamAwayId);
-    
+
     if (!homeTeamValid || !awayTeamValid) {
-      throw new Error("Cada equipo debe tener al menos 10 jugadores para comenzar el juego");
+      throw new Error(
+        "Cada equipo debe tener al menos 10 jugadores para comenzar el juego"
+      );
     }
   }
-  
+
   return prisma.game.update({ where: { id: Number(id) }, data });
 };
 
@@ -110,19 +115,23 @@ export const updateGameTime = async (id, gameTime) => {
   });
 };
 
-export const setStartingPlayers = async (gameId, homeStarters, awayStarters) => {
+export const setStartingPlayers = async (
+  gameId,
+  homeStarters,
+  awayStarters
+) => {
   return prisma.$transaction(async (tx) => {
     const game = await tx.game.findUnique({
       where: { id: Number(gameId) },
       include: {
         teamHome: {
-          include: { players: true }
+          include: { players: true },
         },
         teamAway: {
-          include: { players: true }
+          include: { players: true },
         },
-        activePlayers: true
-      }
+        activePlayers: true,
+      },
     });
 
     if (!game) {
@@ -131,82 +140,94 @@ export const setStartingPlayers = async (gameId, homeStarters, awayStarters) => 
 
     // Validate the number of starters
     if (homeStarters.length !== 5 || awayStarters.length !== 5) {
-      throw new Error("Cada equipo debe tener exactamente 5 jugadores titulares");
+      throw new Error(
+        "Cada equipo debe tener exactamente 5 jugadores titulares"
+      );
     }
 
     // Verify all home starters exist and belong to home team
     const homeStarterPlayers = await tx.player.findMany({
-      where: { 
-        id: { in: homeStarters.map(id => Number(id)) },
-        teamId: game.teamHomeId
-      }
+      where: {
+        id: { in: homeStarters.map((id) => Number(id)) },
+        teamId: game.teamHomeId,
+      },
     });
 
     if (homeStarterPlayers.length !== 5) {
-      throw new Error("Uno o más jugadores titulares del equipo local no existen o no pertenecen al equipo");
+      throw new Error(
+        "Uno o más jugadores titulares del equipo local no existen o no pertenecen al equipo"
+      );
     }
 
     // Verify all away starters exist and belong to away team
     const awayStarterPlayers = await tx.player.findMany({
-      where: { 
-        id: { in: awayStarters.map(id => Number(id)) },
-        teamId: game.teamAwayId
-      }
+      where: {
+        id: { in: awayStarters.map((id) => Number(id)) },
+        teamId: game.teamAwayId,
+      },
     });
 
     if (awayStarterPlayers.length !== 5) {
-      throw new Error("Uno o más jugadores titulares del equipo visitante no existen o no pertenecen al equipo");
+      throw new Error(
+        "Uno o más jugadores titulares del equipo visitante no existen o no pertenecen al equipo"
+      );
     }
 
     // Combine all starters
-    const allStarters = [...homeStarters, ...awayStarters].map(id => Number(id));
+    const allStarters = [...homeStarters, ...awayStarters].map((id) =>
+      Number(id)
+    );
 
     // Update active players
     const updatedGame = await tx.game.update({
       where: { id: Number(gameId) },
       data: {
         activePlayers: {
-          set: allStarters.map(id => ({ id }))
-        }
+          set: allStarters.map((id) => ({ id })),
+        },
       },
       include: {
         activePlayers: {
           include: {
-            team: true
-          }
+            team: true,
+          },
         },
         teamHome: true,
-        teamAway: true
-      }
+        teamAway: true,
+      },
     });
 
     // Organize players by team for the response
-    const homePlayers = updatedGame.activePlayers.filter(p => p.teamId === updatedGame.teamHomeId);
-    const awayPlayers = updatedGame.activePlayers.filter(p => p.teamId === updatedGame.teamAwayId);
+    const homePlayers = updatedGame.activePlayers.filter(
+      (p) => p.teamId === updatedGame.teamHomeId
+    );
+    const awayPlayers = updatedGame.activePlayers.filter(
+      (p) => p.teamId === updatedGame.teamAwayId
+    );
 
     return {
       homeTeam: {
         id: updatedGame.teamHomeId,
         name: updatedGame.teamHome.nombre,
-        starters: homePlayers.map(player => ({
+        starters: homePlayers.map((player) => ({
           id: player.id,
           nombre: player.nombre,
           apellido: player.apellido,
           numero: player.numero,
-          posicion: player.posicion
-        }))
+          posicion: player.posicion,
+        })),
       },
       awayTeam: {
         id: updatedGame.teamAwayId,
         name: updatedGame.teamAway.nombre,
-        starters: awayPlayers.map(player => ({
+        starters: awayPlayers.map((player) => ({
           id: player.id,
           nombre: player.nombre,
           apellido: player.apellido,
           numero: player.numero,
-          posicion: player.posicion
-        }))
-      }
+          posicion: player.posicion,
+        })),
+      },
     };
   });
 };
@@ -216,7 +237,7 @@ export const updateScore = async (id, homeScore, awayScore) => {
     where: { id: Number(id) },
     data: {
       homeScore: Number(homeScore),
-      awayScore: Number(awayScore)
+      awayScore: Number(awayScore),
     },
   });
 };
@@ -226,24 +247,72 @@ export const updatePlayerStats = async (gameId, playerId, stats) => {
     where: {
       gameId_playerId: {
         gameId: Number(gameId),
-        playerId: Number(playerId)
-      }
+        playerId: Number(playerId),
+      },
     },
     update: stats,
     create: {
       gameId: Number(gameId),
       playerId: Number(playerId),
-      ...stats
+      ...stats,
     },
   });
 };
 
+export const updatePlayerMinutes = async (gameId, playerMinutes) => {
+  return prisma.$transaction(async (tx) => {
+    const updatedStats = [];
+
+    // Convert minutes from milliseconds to seconds for storage
+    for (const [playerId, minutesInMs] of Object.entries(playerMinutes)) {
+      const minutesInSeconds = Math.floor(Number(minutesInMs) / 1000);
+
+      // Use upsert to safely update only minutes, preserving other stats
+      const updated = await tx.playerGameStats.upsert({
+        where: {
+          gameId_playerId: {
+            gameId: Number(gameId),
+            playerId: Number(playerId),
+          },
+        },
+        update: {
+          minutos: minutesInSeconds,
+        },
+        create: {
+          gameId: Number(gameId),
+          playerId: Number(playerId),
+          puntos: 0,
+          rebotes: 0,
+          asistencias: 0,
+          robos: 0,
+          tapones: 0,
+          tirosIntentados: 0,
+          tirosAnotados: 0,
+          tiros3Intentados: 0,
+          tiros3Anotados: 0,
+          tirosLibresIntentados: 0,
+          tirosLibresAnotados: 0,
+          minutos: minutesInSeconds,
+          plusMinus: 0,
+          perdidas: 0,
+        },
+      });
+
+      updatedStats.push(updated);
+    }
+
+    return {
+      message: `Updated minutes for ${updatedStats.length} players`,
+      updatedStats,
+    };
+  });
+};
 export const getGameStats = async (id) => {
   return prisma.playerGameStats.findMany({
     where: { gameId: Number(id) },
     include: {
-      player: true
-    }
+      player: true,
+    },
   });
 };
 
@@ -253,12 +322,12 @@ export const getActivePlayers = async (id) => {
     include: {
       activePlayers: {
         include: {
-          team: true  // Include team information for each player
-        }
+          team: true, // Include team information for each player
+        },
       },
       teamHome: true,
-      teamAway: true
-    }
+      teamAway: true,
+    },
   });
 
   if (!game) {
@@ -266,18 +335,22 @@ export const getActivePlayers = async (id) => {
   }
 
   // Separate players by team
-  const homePlayers = game.activePlayers.filter(player => player.teamId === game.teamHomeId);
-  const awayPlayers = game.activePlayers.filter(player => player.teamId === game.teamAwayId);
+  const homePlayers = game.activePlayers.filter(
+    (player) => player.teamId === game.teamHomeId
+  );
+  const awayPlayers = game.activePlayers.filter(
+    (player) => player.teamId === game.teamAwayId
+  );
 
   return {
     homeTeam: {
       name: game.teamHome.nombre,
-      players: homePlayers
+      players: homePlayers,
     },
     awayTeam: {
       name: game.teamAway.nombre,
-      players: awayPlayers
-    }
+      players: awayPlayers,
+    },
   };
 };
 
@@ -289,8 +362,8 @@ export const updateTeamActivePlayers = async (id, playerIds, teamType) => {
       include: {
         teamHome: true,
         teamAway: true,
-        activePlayers: true
-      }
+        activePlayers: true,
+      },
     });
 
     if (!game) {
@@ -301,9 +374,9 @@ export const updateTeamActivePlayers = async (id, playerIds, teamType) => {
     const players = await tx.player.findMany({
       where: {
         id: {
-          in: playerIds.map(id => Number(id))
-        }
-      }
+          in: playerIds.map((id) => Number(id)),
+        },
+      },
     });
 
     // Validate all players exist
@@ -312,20 +385,23 @@ export const updateTeamActivePlayers = async (id, playerIds, teamType) => {
     }
 
     // Validate players belong to the correct team
-    const expectedTeamId = teamType === 'home' ? game.teamHomeId : game.teamAwayId;
-    const invalidPlayers = players.filter(p => p.teamId !== expectedTeamId);
+    const expectedTeamId =
+      teamType === "home" ? game.teamHomeId : game.teamAwayId;
+    const invalidPlayers = players.filter((p) => p.teamId !== expectedTeamId);
     if (invalidPlayers.length > 0) {
       throw new Error("Uno o más jugadores no pertenecen al equipo correcto");
     }
 
     // Get current active players from the other team
-    const otherTeamId = teamType === 'home' ? game.teamAwayId : game.teamHomeId;
-    const otherTeamPlayers = game.activePlayers.filter(p => p.teamId === otherTeamId);
+    const otherTeamId = teamType === "home" ? game.teamAwayId : game.teamHomeId;
+    const otherTeamPlayers = game.activePlayers.filter(
+      (p) => p.teamId === otherTeamId
+    );
 
     // Prepare the complete list of active players (new team players + other team's existing players)
     const allActivePlayerIds = [
       ...playerIds,
-      ...otherTeamPlayers.map(p => p.id)
+      ...otherTeamPlayers.map((p) => p.id),
     ];
 
     // Update active players
@@ -333,35 +409,39 @@ export const updateTeamActivePlayers = async (id, playerIds, teamType) => {
       where: { id: Number(id) },
       data: {
         activePlayers: {
-          set: allActivePlayerIds.map(id => ({ id: Number(id) }))
-        }
+          set: allActivePlayerIds.map((id) => ({ id: Number(id) })),
+        },
       },
       include: {
         activePlayers: {
           include: {
-            team: true
-          }
+            team: true,
+          },
         },
         teamHome: true,
-        teamAway: true
-      }
+        teamAway: true,
+      },
     });
 
     // Organize players by team for the response
-    const homePlayers = updatedGame.activePlayers.filter(p => p.teamId === updatedGame.teamHomeId);
-    const awayPlayers = updatedGame.activePlayers.filter(p => p.teamId === updatedGame.teamAwayId);
+    const homePlayers = updatedGame.activePlayers.filter(
+      (p) => p.teamId === updatedGame.teamHomeId
+    );
+    const awayPlayers = updatedGame.activePlayers.filter(
+      (p) => p.teamId === updatedGame.teamAwayId
+    );
 
     return {
       homeTeam: {
         id: updatedGame.teamHomeId,
         name: updatedGame.teamHome.nombre,
-        players: homePlayers
+        players: homePlayers,
       },
       awayTeam: {
         id: updatedGame.teamAwayId,
         name: updatedGame.teamAway.nombre,
-        players: awayPlayers
-      }
+        players: awayPlayers,
+      },
     };
   });
 };
@@ -372,16 +452,16 @@ export const getBenchPlayers = async (gameId) => {
     include: {
       teamHome: {
         include: {
-          players: true
-        }
+          players: true,
+        },
       },
       teamAway: {
         include: {
-          players: true
-        }
+          players: true,
+        },
       },
-      activePlayers: true
-    }
+      activePlayers: true,
+    },
   });
 
   if (!game) {
@@ -393,23 +473,23 @@ export const getBenchPlayers = async (gameId) => {
   const awayPlayers = game.teamAway.players;
 
   // Get active player IDs
-  const activePlayerIds = new Set(game.activePlayers.map(p => p.id));
+  const activePlayerIds = new Set(game.activePlayers.map((p) => p.id));
 
   // Filter out active players to get bench players
-  const homeBench = homePlayers.filter(p => !activePlayerIds.has(p.id));
-  const awayBench = awayPlayers.filter(p => !activePlayerIds.has(p.id));
+  const homeBench = homePlayers.filter((p) => !activePlayerIds.has(p.id));
+  const awayBench = awayPlayers.filter((p) => !activePlayerIds.has(p.id));
 
   return {
     homeTeam: {
       id: game.teamHomeId,
       name: game.teamHome.nombre,
-      benchPlayers: homeBench
+      benchPlayers: homeBench,
     },
     awayTeam: {
       id: game.teamAwayId,
       name: game.teamAway.nombre,
-      benchPlayers: awayBench
-    }
+      benchPlayers: awayBench,
+    },
   };
 };
 
@@ -425,10 +505,10 @@ export const getTeamBenchPlayers = async (gameId, teamType) => {
               nombre: true,
               apellido: true,
               numero: true,
-              posicion: true
-            }
-          }
-        }
+              posicion: true,
+            },
+          },
+        },
       },
       teamAway: {
         include: {
@@ -438,17 +518,17 @@ export const getTeamBenchPlayers = async (gameId, teamType) => {
               nombre: true,
               apellido: true,
               numero: true,
-              posicion: true
-            }
-          }
-        }
+              posicion: true,
+            },
+          },
+        },
       },
       activePlayers: {
         select: {
-          id: true
-        }
-      }
-    }
+          id: true,
+        },
+      },
+    },
   });
 
   if (!game) {
@@ -456,34 +536,40 @@ export const getTeamBenchPlayers = async (gameId, teamType) => {
   }
 
   // Get active player IDs
-  const activePlayerIds = new Set(game.activePlayers.map(p => p.id));
+  const activePlayerIds = new Set(game.activePlayers.map((p) => p.id));
 
   // Get the requested team's players
-  const team = teamType === 'home' ? game.teamHome : game.teamAway;
-  const benchPlayers = team.players.filter(p => !activePlayerIds.has(p.id));
+  const team = teamType === "home" ? game.teamHome : game.teamAway;
+  const benchPlayers = team.players.filter((p) => !activePlayerIds.has(p.id));
 
   return {
     teamId: team.id,
     teamName: team.nombre,
-    benchPlayers: benchPlayers.map(player => ({
+    benchPlayers: benchPlayers.map((player) => ({
       id: player.id,
       nombre: player.nombre,
       apellido: player.apellido,
       numero: player.numero,
-      posicion: player.posicion
-    }))
+      posicion: player.posicion,
+    })),
   };
 };
 
-export const makeSubstitution = async (gameId, playerOutId, playerInId, gameTime, expectedTeamId = null) => {
+export const makeSubstitution = async (
+  gameId,
+  playerOutId,
+  playerInId,
+  gameTime,
+  expectedTeamId = null
+) => {
   return prisma.$transaction(async (tx) => {
     const game = await tx.game.findUnique({
       where: { id: Number(gameId) },
       include: {
         activePlayers: true,
         teamHome: true,
-        teamAway: true
-      }
+        teamAway: true,
+      },
     });
 
     if (!game) {
@@ -493,7 +579,7 @@ export const makeSubstitution = async (gameId, playerOutId, playerInId, gameTime
     // Verify both players exist and get their details
     const [playerOut, playerIn] = await Promise.all([
       tx.player.findUnique({ where: { id: Number(playerOutId) } }),
-      tx.player.findUnique({ where: { id: Number(playerInId) } })
+      tx.player.findUnique({ where: { id: Number(playerInId) } }),
     ]);
 
     if (!playerOut || !playerIn) {
@@ -507,14 +593,23 @@ export const makeSubstitution = async (gameId, playerOutId, playerInId, gameTime
 
     // Additional team validation if expectedTeamId is provided
     if (expectedTeamId !== null) {
-      if (playerOut.teamId !== expectedTeamId || playerIn.teamId !== expectedTeamId) {
-        throw new Error("Los jugadores deben pertenecer al equipo especificado");
+      if (
+        playerOut.teamId !== expectedTeamId ||
+        playerIn.teamId !== expectedTeamId
+      ) {
+        throw new Error(
+          "Los jugadores deben pertenecer al equipo especificado"
+        );
       }
     }
 
     // Verify playerOut is active and playerIn is on bench
-    const isPlayerOutActive = game.activePlayers.some(p => p.id === Number(playerOutId));
-    const isPlayerInActive = game.activePlayers.some(p => p.id === Number(playerInId));
+    const isPlayerOutActive = game.activePlayers.some(
+      (p) => p.id === Number(playerOutId)
+    );
+    const isPlayerInActive = game.activePlayers.some(
+      (p) => p.id === Number(playerInId)
+    );
 
     if (!isPlayerOutActive) {
       throw new Error("El jugador que sale no está en la cancha");
@@ -531,8 +626,8 @@ export const makeSubstitution = async (gameId, playerOutId, playerInId, gameTime
         playerOutId: Number(playerOutId),
         playerInId: Number(playerInId),
         timestamp: new Date(),
-        gameTime: Number(gameTime)
-      }
+        gameTime: Number(gameTime),
+      },
     });
 
     // Update active players
@@ -541,110 +636,144 @@ export const makeSubstitution = async (gameId, playerOutId, playerInId, gameTime
       data: {
         activePlayers: {
           disconnect: { id: Number(playerOutId) },
-          connect: { id: Number(playerInId) }
-        }
+          connect: { id: Number(playerInId) },
+        },
       },
       include: {
         activePlayers: {
           include: {
-            team: true
-          }
-        }
-      }
+            team: true,
+          },
+        },
+      },
     });
 
     return {
       substitution,
       activePlayers: updatedGame.activePlayers,
-      message: `Sustitución exitosa: ${playerIn.nombre} ${playerIn.apellido} entra por ${playerOut.nombre} ${playerOut.apellido}`
+      message: `Sustitución exitosa: ${playerIn.nombre} ${playerIn.apellido} entra por ${playerOut.nombre} ${playerOut.apellido}`,
     };
   });
 };
 
-export const recordShot = async (gameId, playerId, shotType, made, gameTime, playerMinutes) => {
+export const recordShot = async (
+  gameId,
+  playerId,
+  shotType,
+  made,
+  gameTime
+) => {
   return prisma.$transaction(async (tx) => {
+    // Get game with active players to validate
+    const game = await tx.game.findUnique({
+      where: { id: Number(gameId) },
+      include: {
+        activePlayers: true,
+      },
+    });
+
+    if (!game) {
+      throw new Error("Juego no encontrado");
+    }
+
+    // Check if game is running (estado should be 'in_progress' and time should be running)
+    if (game.estado !== "in_progress") {
+      throw new Error(
+        "No se pueden registrar estadísticas cuando el juego no está en progreso"
+      );
+    }
+
+    // Check if player is on the court (in active players)
+    const isPlayerActive = game.activePlayers.some(
+      (p) => p.id === Number(playerId)
+    );
+
+    if (!isPlayerActive) {
+      throw new Error(
+        "No se pueden registrar estadísticas para jugadores que están en el banquillo"
+      );
+    }
+
     // Update game time first
     await tx.game.update({
       where: { id: Number(gameId) },
-      data: { gameTime: Number(gameTime) }
+      data: { gameTime: Number(gameTime) },
     });
 
-    // Get current player stats
-    let playerStats = await tx.playerGameStats.findUnique({
-      where: {
-        gameId_playerId: {
-          gameId: Number(gameId),
-          playerId: Number(playerId)
-        }
-      }
-    });
-
-    // Initialize stats if they don't exist
-    if (!playerStats) {
-      playerStats = await tx.playerGameStats.create({
-        data: {
-          gameId: Number(gameId),
-          playerId: Number(playerId),
-          puntos: 0,
-          rebotes: 0,
-          asistencias: 0,
-          robos: 0,
-          tapones: 0,
-          tirosIntentados: 0,
-          tirosAnotados: 0,
-          tiros3Intentados: 0,
-          tiros3Anotados: 0,
-          minutos: 0,
-          plusMinus: 0
-        }
-      });
-    }
-
-    // Calculate points and update stats based on basketball rules
+    // Calculate points based on shot type
     let points = 0;
-    let updatedStats = {};
+    let updateData = {};
+    let createData = {
+      gameId: Number(gameId),
+      playerId: Number(playerId),
+      puntos: 0,
+      rebotes: 0,
+      asistencias: 0,
+      robos: 0,
+      tapones: 0,
+      tirosIntentados: 0,
+      tirosAnotados: 0,
+      tiros3Intentados: 0,
+      tiros3Anotados: 0,
+      tirosLibresIntentados: 0,
+      tirosLibresAnotados: 0,
+      perdidas: 0,
+      minutos: 0,
+      plusMinus: 0,
+    };
 
-    if (shotType === '2pt' || shotType === 'field_goal') {
+    if (shotType === "2pt" || shotType === "field_goal") {
       // 2-point field goal
       points = made ? 2 : 0;
-      updatedStats = {
-        puntos: playerStats.puntos + points,
-        tirosIntentados: playerStats.tirosIntentados + 1, // Field goal attempt
-        tirosAnotados: playerStats.tirosAnotados + (made ? 1 : 0) // Field goal made
+      updateData = {
+        puntos: { increment: points },
+        tirosIntentados: { increment: 1 }, // Field goal attempt
+        tirosAnotados: { increment: made ? 1 : 0 }, // Field goal made
       };
-    } else if (shotType === '3pt' || shotType === 'three_point') {
+      createData.puntos = points;
+      createData.tirosIntentados = 1;
+      createData.tirosAnotados = made ? 1 : 0;
+    } else if (shotType === "3pt" || shotType === "three_point") {
       // 3-point field goal (counts as both field goal AND 3-pointer)
       points = made ? 3 : 0;
-      updatedStats = {
-        puntos: playerStats.puntos + points,
+      updateData = {
+        puntos: { increment: points },
         // Field goal stats (3-pointers count as field goals)
-        tirosIntentados: playerStats.tirosIntentados + 1,
-        tirosAnotados: playerStats.tirosAnotados + (made ? 1 : 0),
+        tirosIntentados: { increment: 1 },
+        tirosAnotados: { increment: made ? 1 : 0 },
         // 3-point specific stats
-        tiros3Intentados: playerStats.tiros3Intentados + 1,
-        tiros3Anotados: playerStats.tiros3Anotados + (made ? 1 : 0)
+        tiros3Intentados: { increment: 1 },
+        tiros3Anotados: { increment: made ? 1 : 0 },
       };
-    } else if (shotType === 'ft' || shotType === 'free_throw') {
+      createData.puntos = points;
+      createData.tirosIntentados = 1;
+      createData.tirosAnotados = made ? 1 : 0;
+      createData.tiros3Intentados = 1;
+      createData.tiros3Anotados = made ? 1 : 0;
+    } else if (shotType === "ft" || shotType === "free_throw") {
       // Free throw (doesn't count as field goal)
       points = made ? 1 : 0;
-      updatedStats = {
-        puntos: playerStats.puntos + points
+      updateData = {
+        puntos: { increment: points },
+        tirosLibresIntentados: { increment: 1 },
+        tirosLibresAnotados: { increment: made ? 1 : 0 },
         // Note: Free throws don't count as field goal attempts
       };
+      createData.puntos = points;
+      createData.tirosLibresIntentados = 1;
+      createData.tirosLibresAnotados = made ? 1 : 0;
     }
-    
-    // Update minutes played with the player's actual minutes
-    updatedStats.minutos = playerMinutes;
 
-    // Update player stats
-    const updatedPlayerStats = await tx.playerGameStats.update({
+    // Use upsert to either create or update, preserving existing values
+    const updatedPlayerStats = await tx.playerGameStats.upsert({
       where: {
         gameId_playerId: {
           gameId: Number(gameId),
-          playerId: Number(playerId)
-        }
+          playerId: Number(playerId),
+        },
       },
-      data: updatedStats
+      update: updateData,
+      create: createData,
     });
 
     // Update game score if shot was made
@@ -652,32 +781,34 @@ export const recordShot = async (gameId, playerId, shotType, made, gameTime, pla
     if (made && points > 0) {
       const game = await tx.game.findUnique({
         where: { id: Number(gameId) },
-        include: { 
-          teamHome: { include: { players: true } }, 
-          teamAway: { include: { players: true } } 
-        }
+        include: {
+          teamHome: { include: { players: true } },
+          teamAway: { include: { players: true } },
+        },
       });
 
       // Determine which team scored
-      const isHomeTeam = game.teamHome.players.some(p => p.id === Number(playerId));
-      
+      const isHomeTeam = game.teamHome.players.some(
+        (p) => p.id === Number(playerId)
+      );
+
       updatedGame = await tx.game.update({
         where: { id: Number(gameId) },
         data: {
           homeScore: isHomeTeam ? game.homeScore + points : game.homeScore,
-          awayScore: !isHomeTeam ? game.awayScore + points : game.awayScore
+          awayScore: !isHomeTeam ? game.awayScore + points : game.awayScore,
         },
         include: {
           teamHome: true,
-          teamAway: true
-        }
+          teamAway: true,
+        },
       });
     }
 
     // Get player info for response
     const player = await tx.player.findUnique({
       where: { id: Number(playerId) },
-      include: { team: true }
+      include: { team: true },
     });
 
     return {
@@ -687,53 +818,90 @@ export const recordShot = async (gameId, playerId, shotType, made, gameTime, pla
           id: player.id,
           name: `${player.nombre} ${player.apellido}`,
           number: player.numero,
-          team: player.team.nombre
+          team: player.team.nombre,
         },
         shotType: shotType,
         made: made,
         points: points,
-        description: getShotDescription(shotType, made, points)
+        description: getShotDescription(shotType, made, points),
       },
       playerStats: updatedPlayerStats,
-      gameScore: updatedGame ? {
-        homeScore: updatedGame.homeScore,
-        awayScore: updatedGame.awayScore,
-        homeTeam: updatedGame.teamHome.nombre,
-        awayTeam: updatedGame.teamAway.nombre
-      } : null
+      gameScore: updatedGame
+        ? {
+            homeScore: updatedGame.homeScore,
+            awayScore: updatedGame.awayScore,
+            homeTeam: updatedGame.teamHome.nombre,
+            awayTeam: updatedGame.teamAway.nombre,
+          }
+        : null,
     };
   });
 };
 
 // Helper function to create descriptive shot messages
 const getShotDescription = (shotType, made, points) => {
-  const result = made ? 'MADE' : 'MISSED';
-  
-  switch(shotType) {
-    case '2pt':
-    case 'field_goal':
-      return `${result} 2-point field goal${made ? ` (+${points} points)` : ''}`;
-    case '3pt':
-    case 'three_point':
-      return `${result} 3-point field goal${made ? ` (+${points} points)` : ''}`;
-    case 'ft':
-    case 'free_throw':
-      return `${result} free throw${made ? ` (+${points} point)` : ''}`;
+  const result = made ? "MADE" : "MISSED";
+
+  switch (shotType) {
+    case "2pt":
+    case "field_goal":
+      return `${result} 2-point field goal${
+        made ? ` (+${points} points)` : ""
+      }`;
+    case "3pt":
+    case "three_point":
+      return `${result} 3-point field goal${
+        made ? ` (+${points} points)` : ""
+      }`;
+    case "ft":
+    case "free_throw":
+      return `${result} free throw${made ? ` (+${points} point)` : ""}`;
     default:
-      return `${result} shot${made ? ` (+${points} points)` : ''}`;
+      return `${result} shot${made ? ` (+${points} points)` : ""}`;
   }
 };
 
 export const recordRebound = async (gameId, playerId) => {
+  // Get game with active players to validate
+  const game = await prisma.game.findUnique({
+    where: { id: Number(gameId) },
+    include: {
+      activePlayers: true,
+    },
+  });
+
+  if (!game) {
+    throw new Error("Juego no encontrado");
+  }
+
+  // Check if game is running (estado should be 'in_progress')
+  if (game.estado !== "in_progress") {
+    throw new Error(
+      "No se pueden registrar estadísticas cuando el juego no está en progreso"
+    );
+  }
+
+  // Check if player is on the court (in active players)
+  const isPlayerActive = game.activePlayers.some(
+    (p) => p.id === Number(playerId)
+  );
+
+  if (!isPlayerActive) {
+    throw new Error(
+      "No se pueden registrar estadísticas para jugadores que están en el banquillo"
+    );
+  }
+
+  // Use upsert to either create or update, preserving existing values
   return prisma.playerGameStats.upsert({
     where: {
       gameId_playerId: {
         gameId: Number(gameId),
-        playerId: Number(playerId)
-      }
+        playerId: Number(playerId),
+      },
     },
     update: {
-      rebotes: { increment: 1 }
+      rebotes: { increment: 1 },
     },
     create: {
       gameId: Number(gameId),
@@ -747,22 +915,55 @@ export const recordRebound = async (gameId, playerId) => {
       tirosAnotados: 0,
       tiros3Intentados: 0,
       tiros3Anotados: 0,
+      tirosLibresIntentados: 0,
+      tirosLibresAnotados: 0,
+      perdidas: 0,
       minutos: 0,
-      plusMinus: 0
-    }
+      plusMinus: 0,
+    },
   });
 };
 
 export const recordAssist = async (gameId, playerId) => {
+  // Validate that the game exists and is currently running
+  const game = await prisma.game.findUnique({
+    where: { id: Number(gameId) },
+    include: {
+      activePlayers: true,
+    },
+  });
+
+  if (!game) {
+    throw new Error("Partido no encontrado");
+  }
+
+  if (game.estado !== "in_progress") {
+    throw new Error(
+      "No se pueden registrar estadísticas cuando el juego no está en progreso"
+    );
+  }
+
+  // Validate that the player is currently active (not on bench)
+  const isPlayerActive = game.activePlayers.some(
+    (p) => p.id === Number(playerId)
+  );
+
+  if (!isPlayerActive) {
+    throw new Error(
+      "No se pueden registrar estadísticas para jugadores que están en el banquillo"
+    );
+  }
+
+  // Use upsert to either create or update, preserving existing values
   return prisma.playerGameStats.upsert({
     where: {
       gameId_playerId: {
         gameId: Number(gameId),
-        playerId: Number(playerId)
-      }
+        playerId: Number(playerId),
+      },
     },
     update: {
-      asistencias: { increment: 1 }
+      asistencias: { increment: 1 },
     },
     create: {
       gameId: Number(gameId),
@@ -776,22 +977,55 @@ export const recordAssist = async (gameId, playerId) => {
       tirosAnotados: 0,
       tiros3Intentados: 0,
       tiros3Anotados: 0,
+      tirosLibresIntentados: 0,
+      tirosLibresAnotados: 0,
+      perdidas: 0,
       minutos: 0,
-      plusMinus: 0
-    }
+      plusMinus: 0,
+    },
   });
 };
 
 export const recordSteal = async (gameId, playerId) => {
+  // Validate that the game exists and is currently running
+  const game = await prisma.game.findUnique({
+    where: { id: Number(gameId) },
+    include: {
+      activePlayers: true,
+    },
+  });
+
+  if (!game) {
+    throw new Error("Partido no encontrado");
+  }
+
+  if (game.estado !== "in_progress") {
+    throw new Error(
+      "No se pueden registrar estadísticas cuando el juego no está en progreso"
+    );
+  }
+
+  // Validate that the player is currently active (not on bench)
+  const isPlayerActive = game.activePlayers.some(
+    (p) => p.id === Number(playerId)
+  );
+
+  if (!isPlayerActive) {
+    throw new Error(
+      "No se pueden registrar estadísticas para jugadores que están en el banquillo"
+    );
+  }
+
+  // Use upsert to either create or update, preserving existing values
   return prisma.playerGameStats.upsert({
     where: {
       gameId_playerId: {
         gameId: Number(gameId),
-        playerId: Number(playerId)
-      }
+        playerId: Number(playerId),
+      },
     },
     update: {
-      robos: { increment: 1 }
+      robos: { increment: 1 },
     },
     create: {
       gameId: Number(gameId),
@@ -805,22 +1039,55 @@ export const recordSteal = async (gameId, playerId) => {
       tirosAnotados: 0,
       tiros3Intentados: 0,
       tiros3Anotados: 0,
+      tirosLibresIntentados: 0,
+      tirosLibresAnotados: 0,
+      perdidas: 0,
       minutos: 0,
-      plusMinus: 0
-    }
+      plusMinus: 0,
+    },
   });
 };
 
 export const recordBlock = async (gameId, playerId) => {
+  // Validate that the game exists and is currently running
+  const game = await prisma.game.findUnique({
+    where: { id: Number(gameId) },
+    include: {
+      activePlayers: true,
+    },
+  });
+
+  if (!game) {
+    throw new Error("Partido no encontrado");
+  }
+
+  if (game.estado !== "in_progress") {
+    throw new Error(
+      "No se pueden registrar estadísticas cuando el juego no está en progreso"
+    );
+  }
+
+  // Validate that the player is currently active (not on bench)
+  const isPlayerActive = game.activePlayers.some(
+    (p) => p.id === Number(playerId)
+  );
+
+  if (!isPlayerActive) {
+    throw new Error(
+      "No se pueden registrar estadísticas para jugadores que están en el banquillo"
+    );
+  }
+
+  // Use upsert to either create or update, preserving existing values
   return prisma.playerGameStats.upsert({
     where: {
       gameId_playerId: {
         gameId: Number(gameId),
-        playerId: Number(playerId)
-      }
+        playerId: Number(playerId),
+      },
     },
     update: {
-      tapones: { increment: 1 }
+      tapones: { increment: 1 },
     },
     create: {
       gameId: Number(gameId),
@@ -834,9 +1101,12 @@ export const recordBlock = async (gameId, playerId) => {
       tirosAnotados: 0,
       tiros3Intentados: 0,
       tiros3Anotados: 0,
+      tirosLibresIntentados: 0,
+      tirosLibresAnotados: 0,
+      perdidas: 0,
       minutos: 0,
-      plusMinus: 0
-    }
+      plusMinus: 0,
+    },
   });
 };
 
@@ -846,12 +1116,12 @@ export const updateGameSettings = async (gameId, settings) => {
     data: {
       quarterLength: settings.quarterLength,
       totalQuarters: settings.totalQuarters,
-      overtimeLength: settings.overtimeLength
+      overtimeLength: settings.overtimeLength,
     },
     include: {
       teamHome: true,
-      teamAway: true
-    }
+      teamAway: true,
+    },
   });
 };
 
@@ -861,8 +1131,8 @@ export const nextQuarter = async (gameId) => {
       where: { id: Number(gameId) },
       include: {
         teamHome: true,
-        teamAway: true
-      }
+        teamAway: true,
+      },
     });
 
     if (!game) {
@@ -879,23 +1149,30 @@ export const nextQuarter = async (gameId) => {
       if (game.homeScore === game.awayScore) {
         // Go to overtime
         isOvertime = true;
-        gameStatus = 'overtime';
+        gameStatus = "overtime";
       } else {
         // Game finished
-        gameStatus = 'finished';
+        gameStatus = "finished";
         return {
           game: await tx.game.update({
             where: { id: Number(gameId) },
             data: {
-              estado: gameStatus
+              estado: gameStatus,
             },
             include: {
               teamHome: true,
-              teamAway: true
-            }
+              teamAway: true,
+            },
           }),
-          message: `Juego terminado. ${game.homeScore > game.awayScore ? game.teamHome.nombre : game.teamAway.nombre} ganó ${Math.max(game.homeScore, game.awayScore)}-${Math.min(game.homeScore, game.awayScore)}`,
-          gameEnded: true
+          message: `Juego terminado. ${
+            game.homeScore > game.awayScore
+              ? game.teamHome.nombre
+              : game.teamAway.nombre
+          } ganó ${Math.max(game.homeScore, game.awayScore)}-${Math.min(
+            game.homeScore,
+            game.awayScore
+          )}`,
+          gameEnded: true,
         };
       }
     }
@@ -904,23 +1181,30 @@ export const nextQuarter = async (gameId) => {
     if (game.isOvertime && nextQuarterNum > game.totalQuarters + 1) {
       if (game.homeScore === game.awayScore) {
         // Another overtime
-        gameStatus = 'overtime';
+        gameStatus = "overtime";
       } else {
         // Game finished
-        gameStatus = 'finished';
+        gameStatus = "finished";
         return {
           game: await tx.game.update({
             where: { id: Number(gameId) },
             data: {
-              estado: gameStatus
+              estado: gameStatus,
             },
             include: {
               teamHome: true,
-              teamAway: true
-            }
+              teamAway: true,
+            },
           }),
-          message: `Juego terminado en overtime. ${game.homeScore > game.awayScore ? game.teamHome.nombre : game.teamAway.nombre} ganó ${Math.max(game.homeScore, game.awayScore)}-${Math.min(game.homeScore, game.awayScore)}`,
-          gameEnded: true
+          message: `Juego terminado en overtime. ${
+            game.homeScore > game.awayScore
+              ? game.teamHome.nombre
+              : game.teamAway.nombre
+          } ganó ${Math.max(game.homeScore, game.awayScore)}-${Math.min(
+            game.homeScore,
+            game.awayScore
+          )}`,
+          gameEnded: true,
         };
       }
     }
@@ -932,18 +1216,20 @@ export const nextQuarter = async (gameId) => {
         currentQuarter: nextQuarterNum,
         quarterTime: 0,
         isOvertime: isOvertime,
-        estado: gameStatus
+        estado: gameStatus,
       },
       include: {
         teamHome: true,
-        teamAway: true
-      }
+        teamAway: true,
+      },
     });
 
     return {
       game: updatedGame,
-      message: isOvertime ? `Overtime ${nextQuarterNum - game.totalQuarters}` : `Cuarto ${nextQuarterNum}`,
-      gameEnded: false
+      message: isOvertime
+        ? `Overtime ${nextQuarterNum - game.totalQuarters}`
+        : `Cuarto ${nextQuarterNum}`,
+      gameEnded: false,
     };
   });
 };
@@ -954,21 +1240,51 @@ export const updateQuarterTime = async (gameId, quarterTime) => {
     data: { quarterTime: Number(quarterTime) },
     include: {
       teamHome: true,
-      teamAway: true
-    }
+      teamAway: true,
+    },
   });
 };
 
 export const recordTurnover = async (gameId, playerId) => {
+  // Validate that the game exists and is currently running
+  const game = await prisma.game.findUnique({
+    where: { id: Number(gameId) },
+    include: {
+      activePlayers: true,
+    },
+  });
+
+  if (!game) {
+    throw new Error("Partido no encontrado");
+  }
+
+  if (game.estado !== "in_progress") {
+    throw new Error(
+      "No se pueden registrar estadísticas cuando el juego no está en progreso"
+    );
+  }
+
+  // Validate that the player is currently active (not on bench)
+  const isPlayerActive = game.activePlayers.some(
+    (p) => p.id === Number(playerId)
+  );
+
+  if (!isPlayerActive) {
+    throw new Error(
+      "No se pueden registrar estadísticas para jugadores que están en el banquillo"
+    );
+  }
+
+  // Use upsert to either create or update, preserving existing values
   return prisma.playerGameStats.upsert({
     where: {
       gameId_playerId: {
         gameId: Number(gameId),
-        playerId: Number(playerId)
-      }
+        playerId: Number(playerId),
+      },
     },
     update: {
-      perdidas: { increment: 1 }
+      perdidas: { increment: 1 },
     },
     create: {
       gameId: Number(gameId),
@@ -982,10 +1298,12 @@ export const recordTurnover = async (gameId, playerId) => {
       tirosAnotados: 0,
       tiros3Intentados: 0,
       tiros3Anotados: 0,
+      tirosLibresIntentados: 0,
+      tirosLibresAnotados: 0,
       perdidas: 1,
       minutos: 0,
-      plusMinus: 0
-    }
+      plusMinus: 0,
+    },
   });
 };
 
@@ -994,17 +1312,20 @@ export const checkGameEnd = async (gameId) => {
     where: { id: Number(gameId) },
     include: {
       teamHome: true,
-      teamAway: true
-    }
+      teamAway: true,
+    },
   });
 
   if (!game) {
     throw new Error("Juego no encontrado");
   }
 
-  const quarterLength = game.isOvertime ? game.overtimeLength : game.quarterLength;
+  const quarterLength = game.isOvertime
+    ? game.overtimeLength
+    : game.quarterLength;
   const isQuarterFinished = game.quarterTime >= quarterLength;
-  const isRegulationFinished = game.currentQuarter >= game.totalQuarters && isQuarterFinished;
+  const isRegulationFinished =
+    game.currentQuarter >= game.totalQuarters && isQuarterFinished;
   const isOvertimeFinished = game.isOvertime && isQuarterFinished;
 
   return {
@@ -1013,9 +1334,125 @@ export const checkGameEnd = async (gameId) => {
     isRegulationFinished,
     isOvertimeFinished,
     isTied: game.homeScore === game.awayScore,
-    needsOvertime: isRegulationFinished && game.homeScore === game.awayScore && !game.isOvertime,
-    canEndGame: (isRegulationFinished || isOvertimeFinished) && game.homeScore !== game.awayScore,
+    needsOvertime:
+      isRegulationFinished &&
+      game.homeScore === game.awayScore &&
+      !game.isOvertime,
+    canEndGame:
+      (isRegulationFinished || isOvertimeFinished) &&
+      game.homeScore !== game.awayScore,
     timeRemaining: quarterLength - game.quarterTime,
-    quarterProgress: (game.quarterTime / quarterLength) * 100
+    quarterProgress: (game.quarterTime / quarterLength) * 100,
   };
+};
+
+export const startGame = async (gameId, activePlayerIds, gameSettings) => {
+  return prisma.$transaction(async (tx) => {
+    // Validate game exists and is not already started
+    const game = await tx.game.findUnique({
+      where: { id: Number(gameId) },
+      include: {
+        teamHome: { include: { players: true } },
+        teamAway: { include: { players: true } },
+      },
+    });
+
+    if (!game) {
+      throw new Error("Juego no encontrado");
+    }
+
+    if (game.estado === "in_progress") {
+      throw new Error("El juego ya está en progreso");
+    }
+
+    // Validate active players (should be 5 per team = 10 total)
+    if (!activePlayerIds || activePlayerIds.length !== 10) {
+      throw new Error(
+        "Debe seleccionar exactamente 10 jugadores activos (5 por equipo)"
+      );
+    }
+
+    // Validate players belong to the teams
+    const allTeamPlayers = [...game.teamHome.players, ...game.teamAway.players];
+    const invalidPlayers = activePlayerIds.filter(
+      (id) => !allTeamPlayers.some((player) => player.id === Number(id))
+    );
+
+    if (invalidPlayers.length > 0) {
+      throw new Error(`Jugadores inválidos: ${invalidPlayers.join(", ")}`);
+    }
+
+    // Update game settings if provided
+    const updateData = {
+      estado: "in_progress",
+      currentQuarter: 1,
+      quarterTime: 0,
+      gameTime: 0,
+      isOvertime: false,
+      activePlayers: {
+        set: activePlayerIds.map((id) => ({ id: Number(id) })),
+      },
+    };
+
+    if (gameSettings) {
+      if (gameSettings.quarterLength)
+        updateData.quarterLength = gameSettings.quarterLength;
+      if (gameSettings.totalQuarters)
+        updateData.totalQuarters = gameSettings.totalQuarters;
+      if (gameSettings.overtimeLength)
+        updateData.overtimeLength = gameSettings.overtimeLength;
+    }
+
+    // Start the game
+    const updatedGame = await tx.game.update({
+      where: { id: Number(gameId) },
+      data: updateData,
+      include: {
+        teamHome: { include: { players: true } },
+        teamAway: { include: { players: true } },
+        activePlayers: true,
+      },
+    });
+
+    // Initialize player stats for active players
+    for (const playerId of activePlayerIds) {
+      await tx.playerGameStats.upsert({
+        where: {
+          gameId_playerId: {
+            gameId: Number(gameId),
+            playerId: Number(playerId),
+          },
+        },
+        update: {},
+        create: {
+          gameId: Number(gameId),
+          playerId: Number(playerId),
+          puntos: 0,
+          rebotes: 0,
+          asistencias: 0,
+          robos: 0,
+          tapones: 0,
+          tirosIntentados: 0,
+          tirosAnotados: 0,
+          tiros3Intentados: 0,
+          tiros3Anotados: 0,
+          minutos: 0,
+          plusMinus: 0,
+          perdidas: 0,
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: "Juego iniciado correctamente",
+      game: updatedGame,
+      activePlayers: updatedGame.activePlayers,
+      gameSettings: {
+        quarterLength: updatedGame.quarterLength,
+        totalQuarters: updatedGame.totalQuarters,
+        overtimeLength: updatedGame.overtimeLength,
+      },
+    };
+  });
 };

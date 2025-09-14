@@ -15,6 +15,7 @@ router.put("/:id/score", gameController.updateScore);
 router.put("/:id/full-update", gameController.fullUpdateGame);
 router.get("/:id/stats", gameController.getGameStats);
 router.put("/:id/player-stats", gameController.updatePlayerStats);
+router.put("/:id/player-minutes", gameController.updatePlayerMinutes);
 router.get("/:id/active-players", gameController.getActivePlayers);
 router.get("/:id/bench-players", gameController.getBenchPlayers);
 router.get("/:id/bench-players/home", gameController.getHomeBenchPlayers);
@@ -32,5 +33,6 @@ router.put("/:id/settings", gameController.updateGameSettings);
 router.post("/:id/next-quarter", gameController.nextQuarter);
 router.put("/:id/quarter-time", gameController.updateQuarterTime);
 router.get("/:id/check-end", gameController.checkGameEnd);
+router.post("/:id/start", gameController.startGame);
 
 export default router;

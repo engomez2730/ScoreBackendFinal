@@ -8,7 +8,7 @@ import cors from "cors";
 import { PrismaClient } from "@prisma/client";
 import playersRouter from "./routes/players.js";
 import teamsRouter from "./routes/teams.js";
-import eventsRouter from "./routes/events.js";  
+import eventsRouter from "./routes/events.js";
 
 const app = express();
 const server = http.createServer(app);

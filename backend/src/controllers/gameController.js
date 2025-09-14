@@ -1,14 +1,21 @@
 export const fullUpdateGame = async (req, res) => {
   try {
     const gameId = req.params.id;
-    const { homeScore, awayScore, currentQuarter, quarterTime, gameTime, playerStats } = req.body;
+    const {
+      homeScore,
+      awayScore,
+      currentQuarter,
+      quarterTime,
+      gameTime,
+      playerStats,
+    } = req.body;
     const result = await gameService.fullUpdateGame(gameId, {
       homeScore,
       awayScore,
       currentQuarter,
       quarterTime,
       gameTime,
-      playerStats
+      playerStats,
     });
     res.json(result);
   } catch (error) {
@@ -108,7 +115,11 @@ export const resetGameTime = async (req, res) => {
 export const updateScore = async (req, res) => {
   const { homeScore, awayScore } = req.body;
   try {
-    const game = await gameService.updateScore(req.params.id, homeScore, awayScore);
+    const game = await gameService.updateScore(
+      req.params.id,
+      homeScore,
+      awayScore
+    );
     res.json(game);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -118,8 +129,24 @@ export const updateScore = async (req, res) => {
 export const updatePlayerStats = async (req, res) => {
   const { playerId, stats } = req.body;
   try {
-    const playerStats = await gameService.updatePlayerStats(req.params.id, playerId, stats);
+    const playerStats = await gameService.updatePlayerStats(
+      req.params.id,
+      playerId,
+      stats
+    );
     res.json(playerStats);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+export const updatePlayerMinutes = async (req, res) => {
+  try {
+    const result = await gameService.updatePlayerMinutes(
+      req.params.id,
+      req.body
+    );
+    res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -151,14 +178,22 @@ export const updateHomeActivePlayers = async (req, res) => {
   const { playerIds } = req.body;
   try {
     if (!playerIds || !Array.isArray(playerIds)) {
-      return res.status(400).json({ error: "Se requiere un array de IDs de jugadores" });
+      return res
+        .status(400)
+        .json({ error: "Se requiere un array de IDs de jugadores" });
     }
 
     if (playerIds.length !== 5) {
-      return res.status(400).json({ error: "Se requieren exactamente 5 jugadores" });
+      return res
+        .status(400)
+        .json({ error: "Se requieren exactamente 5 jugadores" });
     }
 
-    const result = await gameService.updateTeamActivePlayers(req.params.id, playerIds, 'home');
+    const result = await gameService.updateTeamActivePlayers(
+      req.params.id,
+      playerIds,
+      "home"
+    );
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -169,14 +204,22 @@ export const updateAwayActivePlayers = async (req, res) => {
   const { playerIds } = req.body;
   try {
     if (!playerIds || !Array.isArray(playerIds)) {
-      return res.status(400).json({ error: "Se requiere un array de IDs de jugadores" });
+      return res
+        .status(400)
+        .json({ error: "Se requiere un array de IDs de jugadores" });
     }
 
     if (playerIds.length !== 5) {
-      return res.status(400).json({ error: "Se requieren exactamente 5 jugadores" });
+      return res
+        .status(400)
+        .json({ error: "Se requieren exactamente 5 jugadores" });
     }
 
-    const result = await gameService.updateTeamActivePlayers(req.params.id, playerIds, 'away');
+    const result = await gameService.updateTeamActivePlayers(
+      req.params.id,
+      playerIds,
+      "away"
+    );
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -194,7 +237,10 @@ export const getBenchPlayers = async (req, res) => {
 
 export const getHomeBenchPlayers = async (req, res) => {
   try {
-    const benchPlayers = await gameService.getTeamBenchPlayers(req.params.id, 'home');
+    const benchPlayers = await gameService.getTeamBenchPlayers(
+      req.params.id,
+      "home"
+    );
     res.json(benchPlayers);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -203,7 +249,10 @@ export const getHomeBenchPlayers = async (req, res) => {
 
 export const getAwayBenchPlayers = async (req, res) => {
   try {
-    const benchPlayers = await gameService.getTeamBenchPlayers(req.params.id, 'away');
+    const benchPlayers = await gameService.getTeamBenchPlayers(
+      req.params.id,
+      "away"
+    );
     res.json(benchPlayers);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -212,10 +261,11 @@ export const getAwayBenchPlayers = async (req, res) => {
 
 export const makeSubstitution = async (req, res) => {
   const { playerInId, playerOutId, gameTime } = req.body;
-  
+
   if (!playerInId || !playerOutId || gameTime === undefined) {
-    return res.status(400).json({ 
-      error: "Se requiere playerInId (jugador que entra), playerOutId (jugador que sale) y gameTime (tiempo actual del juego)" 
+    return res.status(400).json({
+      error:
+        "Se requiere playerInId (jugador que entra), playerOutId (jugador que sale) y gameTime (tiempo actual del juego)",
     });
   }
 
@@ -232,18 +282,21 @@ export const makeSubstitution = async (req, res) => {
   }
 };
 
-
-
 export const recordShot = async (req, res) => {
-  const { playerId, shotType, made, gameTime, playerMinutes } = req.body;
+  const { playerId, shotType, made, gameTime } = req.body;
   if (gameTime === undefined) {
-    return res.status(400).json({ error: "Se requiere el tiempo actual del juego (gameTime)" });
-  }
-  if (playerMinutes === undefined) {
-    return res.status(400).json({ error: "Se requiere los minutos jugados del jugador (playerMinutes)" });
+    return res
+      .status(400)
+      .json({ error: "Se requiere el tiempo actual del juego (gameTime)" });
   }
   try {
-    const result = await gameService.recordShot(req.params.id, playerId, shotType, made, gameTime, playerMinutes);
+    const result = await gameService.recordShot(
+      req.params.id,
+      playerId,
+      shotType,
+      made,
+      gameTime
+    );
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -296,7 +349,7 @@ export const updateGameSettings = async (req, res) => {
     const game = await gameService.updateGameSettings(req.params.id, {
       quarterLength,
       totalQuarters,
-      overtimeLength
+      overtimeLength,
     });
     res.json(game);
   } catch (error) {
@@ -316,7 +369,10 @@ export const nextQuarter = async (req, res) => {
 export const updateQuarterTime = async (req, res) => {
   const { quarterTime } = req.body;
   try {
-    const game = await gameService.updateQuarterTime(req.params.id, quarterTime);
+    const game = await gameService.updateQuarterTime(
+      req.params.id,
+      quarterTime
+    );
     res.json(game);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -326,6 +382,20 @@ export const updateQuarterTime = async (req, res) => {
 export const checkGameEnd = async (req, res) => {
   try {
     const result = await gameService.checkGameEnd(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+export const startGame = async (req, res) => {
+  const { activePlayerIds, gameSettings } = req.body;
+  try {
+    const result = await gameService.startGame(
+      req.params.id,
+      activePlayerIds,
+      gameSettings
+    );
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });

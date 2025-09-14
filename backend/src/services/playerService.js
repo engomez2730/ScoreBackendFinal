@@ -24,6 +24,18 @@ export const getPlayerById = async (id) => {
   });
 };
 
+export const getPlayersByTeam = async (teamId) => {
+  return prisma.player.findMany({
+    where: { teamId: Number(teamId) },
+    include: {
+      team: true,
+      stats: true,
+      substitutionsIn: true,
+      substitutionsOut: true,
+    },
+  });
+};
+
 export const createPlayer = async (data) => {
   return prisma.player.create({ data });
 };

@@ -86,11 +86,13 @@ model PlayerGameStats {
   tirosAnotados    Int
   tiros3Intentados Int
   tiros3Anotados   Int
+  tirosLibresIntentados Int @default(0)
+  tirosLibresAnotados   Int @default(0)
   minutos          Int
   plusMinus        Int
   perdidas         Int     @default(0)
-  game             Game   @relation(fields: [gameId], references: [id])
-  player           Player @relation(fields: [playerId], references: [id])
+  game             Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player           Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
   
   @@unique([gameId, playerId])
 }
@@ -102,7 +104,7 @@ model Substitution {
   playerOutId Int
   timestamp  DateTime
   gameTime   Int
-  game       Game   @relation(fields: [gameId], references: [id])
-  playerIn   Player @relation("PlayerIn", fields: [playerInId], references: [id])
-  playerOut  Player @relation("PlayerOut", fields: [playerOutId], references: [id])
+  game       Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  playerIn   Player @relation("PlayerIn", fields: [playerInId], references: [id], onDelete: Cascade)
+  playerOut  Player @relation("PlayerOut", fields: [playerOutId], references: [id], onDelete: Cascade)
 }
