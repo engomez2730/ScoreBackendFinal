@@ -709,7 +709,7 @@ export const recordShot = async (
   shotType,
   made,
   gameTime,
-  playersOnCourt
+  playerMinutes
 ) => {
   return prisma.$transaction(async (tx) => {
     // Get game with active players to validate
@@ -827,24 +827,25 @@ export const recordShot = async (
     // Update game score if shot was made
     let updatedGame = null;
     if (made && points > 0) {
-      const game = await tx.game.findUnique({
+      const gameWithTeams = await tx.game.findUnique({
         where: { id: Number(gameId) },
         include: {
           teamHome: { include: { players: true } },
           teamAway: { include: { players: true } },
+          activePlayers: true
         },
       });
 
       // Determine which team scored
-      const isHomeTeam = game.teamHome.players.some(
+      const isHomeTeam = gameWithTeams.teamHome.players.some(
         (p) => p.id === Number(playerId)
       );
 
       updatedGame = await tx.game.update({
         where: { id: Number(gameId) },
         data: {
-          homeScore: isHomeTeam ? game.homeScore + points : game.homeScore,
-          awayScore: !isHomeTeam ? game.awayScore + points : game.awayScore,
+          homeScore: isHomeTeam ? gameWithTeams.homeScore + points : gameWithTeams.homeScore,
+          awayScore: !isHomeTeam ? gameWithTeams.awayScore + points : gameWithTeams.awayScore,
         },
         include: {
           teamHome: true,
@@ -852,52 +853,48 @@ export const recordShot = async (
         },
       });
 
-      // Update plus/minus for all players on court if shot was made
-      if (playersOnCourt && Array.isArray(playersOnCourt) && playersOnCourt.length === 10) {
-        for (const courtPlayerId of playersOnCourt) {
-          // Get the player's team to determine if they get + or - points
-          const courtPlayer = await tx.player.findUnique({
-            where: { id: Number(courtPlayerId) }
-          });
+      // Update plus/minus for all players currently on court
+      console.log('Updating plus/minus for active players:', gameWithTeams.activePlayers.length);
+      
+      for (const courtPlayer of gameWithTeams.activePlayers) {
+        // If player is on the same team as the shooter, they get +points
+        // If player is on the opposing team, they get -points
+        const shooterTeamId = isHomeTeam ? gameWithTeams.teamHomeId : gameWithTeams.teamAwayId;
+        const isSameTeam = courtPlayer.teamId === shooterTeamId;
+        const plusMinusChange = isSameTeam ? points : -points;
 
-          if (courtPlayer) {
-            // If player is on the same team as the shooter, they get +points
-            // If player is on the opposing team, they get -points
-            const isSameTeam = courtPlayer.teamId === player.team.id;
-            const plusMinusChange = isSameTeam ? points : -points;
+        console.log(`Player ${courtPlayer.id}: ${isSameTeam ? 'same team' : 'opposing team'}, plusMinus change: ${plusMinusChange}`);
 
-            // Update the player's plus/minus
-            await tx.playerGameStats.upsert({
-              where: {
-                gameId_playerId: {
-                  gameId: Number(gameId),
-                  playerId: Number(courtPlayerId),
-                },
-              },
-              update: {
-                plusMinus: { increment: plusMinusChange },
-              },
-              create: {
-                gameId: Number(gameId),
-                playerId: Number(courtPlayerId),
-                puntos: 0,
-                rebotes: 0,
-                asistencias: 0,
-                robos: 0,
-                tapones: 0,
-                tirosIntentados: 0,
-                tirosAnotados: 0,
-                tiros3Intentados: 0,
-                tiros3Anotados: 0,
-                tirosLibresIntentados: 0,
-                tirosLibresAnotados: 0,
-                minutos: 0,
-                plusMinus: plusMinusChange,
-                perdidas: 0,
-              },
-            });
-          }
-        }
+        // Update the player's plus/minus
+        await tx.playerGameStats.upsert({
+          where: {
+            gameId_playerId: {
+              gameId: Number(gameId),
+              playerId: courtPlayer.id,
+            },
+          },
+          update: {
+            plusMinus: { increment: plusMinusChange },
+          },
+          create: {
+            gameId: Number(gameId),
+            playerId: courtPlayer.id,
+            puntos: 0,
+            rebotes: 0,
+            asistencias: 0,
+            robos: 0,
+            tapones: 0,
+            tirosIntentados: 0,
+            tirosAnotados: 0,
+            tiros3Intentados: 0,
+            tiros3Anotados: 0,
+            tirosLibresIntentados: 0,
+            tirosLibresAnotados: 0,
+            minutos: 0,
+            plusMinus: plusMinusChange,
+            perdidas: 0,
+          },
+        });
       }
     }
 
