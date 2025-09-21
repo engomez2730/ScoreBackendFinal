@@ -307,6 +307,53 @@ export const updatePlayerMinutes = async (gameId, playerMinutes) => {
     };
   });
 };
+
+export const updatePlayerPlusMinus = async (gameId, playerPlusMinus) => {
+  return prisma.$transaction(async (tx) => {
+    const updatedStats = [];
+
+    for (const [playerId, plusMinusValue] of Object.entries(playerPlusMinus)) {
+      // Use upsert to safely update only plusMinus, preserving other stats
+      const updated = await tx.playerGameStats.upsert({
+        where: {
+          gameId_playerId: {
+            gameId: Number(gameId),
+            playerId: Number(playerId),
+          },
+        },
+        update: {
+          plusMinus: Number(plusMinusValue),
+        },
+        create: {
+          gameId: Number(gameId),
+          playerId: Number(playerId),
+          puntos: 0,
+          rebotes: 0,
+          asistencias: 0,
+          robos: 0,
+          tapones: 0,
+          tirosIntentados: 0,
+          tirosAnotados: 0,
+          tiros3Intentados: 0,
+          tiros3Anotados: 0,
+          tirosLibresIntentados: 0,
+          tirosLibresAnotados: 0,
+          minutos: 0,
+          plusMinus: Number(plusMinusValue),
+          perdidas: 0,
+        },
+      });
+
+      updatedStats.push(updated);
+    }
+
+    return {
+      message: `Updated plus/minus for ${updatedStats.length} players`,
+      updatedStats,
+    };
+  });
+};
+
 export const getGameStats = async (id) => {
   return prisma.playerGameStats.findMany({
     where: { gameId: Number(id) },
@@ -661,7 +708,8 @@ export const recordShot = async (
   playerId,
   shotType,
   made,
-  gameTime
+  gameTime,
+  playersOnCourt
 ) => {
   return prisma.$transaction(async (tx) => {
     // Get game with active players to validate
@@ -803,6 +851,54 @@ export const recordShot = async (
           teamAway: true,
         },
       });
+
+      // Update plus/minus for all players on court if shot was made
+      if (playersOnCourt && Array.isArray(playersOnCourt) && playersOnCourt.length === 10) {
+        for (const courtPlayerId of playersOnCourt) {
+          // Get the player's team to determine if they get + or - points
+          const courtPlayer = await tx.player.findUnique({
+            where: { id: Number(courtPlayerId) }
+          });
+
+          if (courtPlayer) {
+            // If player is on the same team as the shooter, they get +points
+            // If player is on the opposing team, they get -points
+            const isSameTeam = courtPlayer.teamId === player.team.id;
+            const plusMinusChange = isSameTeam ? points : -points;
+
+            // Update the player's plus/minus
+            await tx.playerGameStats.upsert({
+              where: {
+                gameId_playerId: {
+                  gameId: Number(gameId),
+                  playerId: Number(courtPlayerId),
+                },
+              },
+              update: {
+                plusMinus: { increment: plusMinusChange },
+              },
+              create: {
+                gameId: Number(gameId),
+                playerId: Number(courtPlayerId),
+                puntos: 0,
+                rebotes: 0,
+                asistencias: 0,
+                robos: 0,
+                tapones: 0,
+                tirosIntentados: 0,
+                tirosAnotados: 0,
+                tiros3Intentados: 0,
+                tiros3Anotados: 0,
+                tirosLibresIntentados: 0,
+                tirosLibresAnotados: 0,
+                minutos: 0,
+                plusMinus: plusMinusChange,
+                perdidas: 0,
+              },
+            });
+          }
+        }
+      }
     }
 
     // Get player info for response

@@ -16,6 +16,7 @@ router.put("/:id/full-update", gameController.fullUpdateGame);
 router.get("/:id/stats", gameController.getGameStats);
 router.put("/:id/player-stats", gameController.updatePlayerStats);
 router.put("/:id/player-minutes", gameController.updatePlayerMinutes);
+router.put("/:id/player-plusminus", gameController.updatePlayerPlusMinus);
 router.get("/:id/active-players", gameController.getActivePlayers);
 router.get("/:id/bench-players", gameController.getBenchPlayers);
 router.get("/:id/bench-players/home", gameController.getHomeBenchPlayers);

@@ -152,6 +152,18 @@ export const updatePlayerMinutes = async (req, res) => {
   }
 };
 
+export const updatePlayerPlusMinus = async (req, res) => {
+  try {
+    const result = await gameService.updatePlayerPlusMinus(
+      req.params.id,
+      req.body
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 export const getGameStats = async (req, res) => {
   try {
     const stats = await gameService.getGameStats(req.params.id);
@@ -283,7 +295,7 @@ export const makeSubstitution = async (req, res) => {
 };
 
 export const recordShot = async (req, res) => {
-  const { playerId, shotType, made, gameTime } = req.body;
+  const { playerId, shotType, made, gameTime, playersOnCourt } = req.body;
   if (gameTime === undefined) {
     return res
       .status(400)
@@ -295,7 +307,8 @@ export const recordShot = async (req, res) => {
       playerId,
       shotType,
       made,
-      gameTime
+      gameTime,
+      playersOnCourt
     );
     res.json(result);
   } catch (error) {
