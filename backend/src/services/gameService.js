@@ -197,6 +197,45 @@ export const setStartingPlayers = async (
       },
     });
 
+    // Mark starters in PlayerGameStats
+    for (const starterId of allStarters) {
+      await tx.playerGameStats.upsert({
+        where: {
+          gameId_playerId: {
+            gameId: Number(gameId),
+            playerId: starterId,
+          },
+        },
+        update: {
+          isStarter: true,
+        },
+        create: {
+          gameId: Number(gameId),
+          playerId: starterId,
+          puntos: 0,
+          rebotes: 0,
+          asistencias: 0,
+          robos: 0,
+          tapones: 0,
+          tirosIntentados: 0,
+          tirosAnotados: 0,
+          tiros3Intentados: 0,
+          tiros3Anotados: 0,
+          tirosLibresIntentados: 0,
+          tirosLibresAnotados: 0,
+          minutos: 0,
+          plusMinus: 0,
+          perdidas: 0,
+          isStarter: true,
+          puntosQ1: 0,
+          puntosQ2: 0,
+          puntosQ3: 0,
+          puntosQ4: 0,
+          puntosOT: 0,
+        },
+      });
+    }
+
     // Organize players by team for the response
     const homePlayers = updatedGame.activePlayers.filter(
       (p) => p.teamId === updatedGame.teamHomeId
@@ -361,6 +400,87 @@ export const getGameStats = async (id) => {
       player: true,
     },
   });
+};
+
+export const getGameStatsWithBreakdown = async (id) => {
+  const stats = await prisma.playerGameStats.findMany({
+    where: { gameId: Number(id) },
+    include: {
+      player: {
+        include: {
+          team: true
+        }
+      }
+    }
+  });
+
+  // Separate starters and bench players
+  const starters = stats.filter(stat => stat.isStarter);
+  const bench = stats.filter(stat => !stat.isStarter);
+
+  // Calculate team totals
+  const starterStats = {
+    totalPoints: starters.reduce((sum, s) => sum + s.puntos, 0),
+    pointsQ1: starters.reduce((sum, s) => sum + s.puntosQ1, 0),
+    pointsQ2: starters.reduce((sum, s) => sum + s.puntosQ2, 0),
+    pointsQ3: starters.reduce((sum, s) => sum + s.puntosQ3, 0),
+    pointsQ4: starters.reduce((sum, s) => sum + s.puntosQ4, 0),
+    pointsOT: starters.reduce((sum, s) => sum + s.puntosOT, 0),
+    rebounds: starters.reduce((sum, s) => sum + s.rebotes, 0),
+    assists: starters.reduce((sum, s) => sum + s.asistencias, 0),
+    steals: starters.reduce((sum, s) => sum + s.robos, 0),
+    blocks: starters.reduce((sum, s) => sum + s.tapones, 0),
+    turnovers: starters.reduce((sum, s) => sum + s.perdidas, 0),
+    personalFouls: starters.reduce((sum, s) => sum + s.faltasPersonales, 0),
+    foulsQ1: starters.reduce((sum, s) => sum + s.faltasQ1, 0),
+    foulsQ2: starters.reduce((sum, s) => sum + s.faltasQ2, 0),
+    foulsQ3: starters.reduce((sum, s) => sum + s.faltasQ3, 0),
+    foulsQ4: starters.reduce((sum, s) => sum + s.faltasQ4, 0),
+    foulsOT: starters.reduce((sum, s) => sum + s.faltasOT, 0),
+    players: starters
+  };
+
+  const benchStats = {
+    totalPoints: bench.reduce((sum, s) => sum + s.puntos, 0),
+    pointsQ1: bench.reduce((sum, s) => sum + s.puntosQ1, 0),
+    pointsQ2: bench.reduce((sum, s) => sum + s.puntosQ2, 0),
+    pointsQ3: bench.reduce((sum, s) => sum + s.puntosQ3, 0),
+    pointsQ4: bench.reduce((sum, s) => sum + s.puntosQ4, 0),
+    pointsOT: bench.reduce((sum, s) => sum + s.puntosOT, 0),
+    rebounds: bench.reduce((sum, s) => sum + s.rebotes, 0),
+    assists: bench.reduce((sum, s) => sum + s.asistencias, 0),
+    steals: bench.reduce((sum, s) => sum + s.robos, 0),
+    blocks: bench.reduce((sum, s) => sum + s.tapones, 0),
+    turnovers: bench.reduce((sum, s) => sum + s.perdidas, 0),
+    personalFouls: bench.reduce((sum, s) => sum + s.faltasPersonales, 0),
+    foulsQ1: bench.reduce((sum, s) => sum + s.faltasQ1, 0),
+    foulsQ2: bench.reduce((sum, s) => sum + s.faltasQ2, 0),
+    foulsQ3: bench.reduce((sum, s) => sum + s.faltasQ3, 0),
+    foulsQ4: bench.reduce((sum, s) => sum + s.faltasQ4, 0),
+    foulsOT: bench.reduce((sum, s) => sum + s.faltasOT, 0),
+    players: bench
+  };
+
+  return {
+    starters: starterStats,
+    bench: benchStats,
+    quarterBreakdown: {
+      q1: starterStats.pointsQ1 + benchStats.pointsQ1,
+      q2: starterStats.pointsQ2 + benchStats.pointsQ2,
+      q3: starterStats.pointsQ3 + benchStats.pointsQ3,
+      q4: starterStats.pointsQ4 + benchStats.pointsQ4,
+      ot: starterStats.pointsOT + benchStats.pointsOT
+    },
+    foulsBreakdown: {
+      q1: starterStats.foulsQ1 + benchStats.foulsQ1,
+      q2: starterStats.foulsQ2 + benchStats.foulsQ2,
+      q3: starterStats.foulsQ3 + benchStats.foulsQ3,
+      q4: starterStats.foulsQ4 + benchStats.foulsQ4,
+      ot: starterStats.foulsOT + benchStats.foulsOT,
+      total: starterStats.personalFouls + benchStats.personalFouls
+    },
+    allPlayers: stats
+  };
 };
 
 export const getActivePlayers = async (id) => {
@@ -748,7 +868,7 @@ export const recordShot = async (
       data: { gameTime: Number(gameTime) },
     });
 
-    // Calculate points based on shot type
+    // Calculate points based on shot type and determine quarter points
     let points = 0;
     let updateData = {};
     let createData = {
@@ -768,7 +888,27 @@ export const recordShot = async (
       perdidas: 0,
       minutos: 0,
       plusMinus: 0,
+      isStarter: false, // Default to bench player
+      puntosQ1: 0,
+      puntosQ2: 0,
+      puntosQ3: 0,
+      puntosQ4: 0,
+      puntosOT: 0,
     };
+
+    // Determine which quarter we're in for points tracking
+    let quarterPointsField = '';
+    if (game.isOvertime) {
+      quarterPointsField = 'puntosOT';
+    } else {
+      switch (game.currentQuarter) {
+        case 1: quarterPointsField = 'puntosQ1'; break;
+        case 2: quarterPointsField = 'puntosQ2'; break;
+        case 3: quarterPointsField = 'puntosQ3'; break;
+        case 4: quarterPointsField = 'puntosQ4'; break;
+        default: quarterPointsField = 'puntosOT'; break;
+      }
+    }
 
     if (shotType === "2pt" || shotType === "field_goal") {
       // 2-point field goal
@@ -777,10 +917,12 @@ export const recordShot = async (
         puntos: { increment: points },
         tirosIntentados: { increment: 1 }, // Field goal attempt
         tirosAnotados: { increment: made ? 1 : 0 }, // Field goal made
+        [quarterPointsField]: { increment: points }, // Add points to current quarter
       };
       createData.puntos = points;
       createData.tirosIntentados = 1;
       createData.tirosAnotados = made ? 1 : 0;
+      createData[quarterPointsField] = points;
     } else if (shotType === "3pt" || shotType === "three_point") {
       // 3-point field goal (counts as both field goal AND 3-pointer)
       points = made ? 3 : 0;
@@ -792,12 +934,14 @@ export const recordShot = async (
         // 3-point specific stats
         tiros3Intentados: { increment: 1 },
         tiros3Anotados: { increment: made ? 1 : 0 },
+        [quarterPointsField]: { increment: points }, // Add points to current quarter
       };
       createData.puntos = points;
       createData.tirosIntentados = 1;
       createData.tirosAnotados = made ? 1 : 0;
       createData.tiros3Intentados = 1;
       createData.tiros3Anotados = made ? 1 : 0;
+      createData[quarterPointsField] = points;
     } else if (shotType === "ft" || shotType === "free_throw") {
       // Free throw (doesn't count as field goal)
       points = made ? 1 : 0;
@@ -805,6 +949,7 @@ export const recordShot = async (
         puntos: { increment: points },
         tirosLibresIntentados: { increment: 1 },
         tirosLibresAnotados: { increment: made ? 1 : 0 },
+        [quarterPointsField]: { increment: points }, // Add points to current quarter
         // Note: Free throws don't count as field goal attempts
       };
       createData.puntos = points;
@@ -1011,8 +1156,20 @@ export const recordRebound = async (gameId, playerId) => {
       tirosLibresIntentados: 0,
       tirosLibresAnotados: 0,
       perdidas: 0,
+      faltasPersonales: 0,
+      faltasQ1: 0,
+      faltasQ2: 0,
+      faltasQ3: 0,
+      faltasQ4: 0,
+      faltasOT: 0,
       minutos: 0,
       plusMinus: 0,
+      isStarter: false,
+      puntosQ1: 0,
+      puntosQ2: 0,
+      puntosQ3: 0,
+      puntosQ4: 0,
+      puntosOT: 0,
     },
   });
 };
@@ -1073,8 +1230,20 @@ export const recordAssist = async (gameId, playerId) => {
       tirosLibresIntentados: 0,
       tirosLibresAnotados: 0,
       perdidas: 0,
+      faltasPersonales: 0,
+      faltasQ1: 0,
+      faltasQ2: 0,
+      faltasQ3: 0,
+      faltasQ4: 0,
+      faltasOT: 0,
       minutos: 0,
       plusMinus: 0,
+      isStarter: false,
+      puntosQ1: 0,
+      puntosQ2: 0,
+      puntosQ3: 0,
+      puntosQ4: 0,
+      puntosOT: 0,
     },
   });
 };
@@ -1135,8 +1304,20 @@ export const recordSteal = async (gameId, playerId) => {
       tirosLibresIntentados: 0,
       tirosLibresAnotados: 0,
       perdidas: 0,
+      faltasPersonales: 0,
+      faltasQ1: 0,
+      faltasQ2: 0,
+      faltasQ3: 0,
+      faltasQ4: 0,
+      faltasOT: 0,
       minutos: 0,
       plusMinus: 0,
+      isStarter: false,
+      puntosQ1: 0,
+      puntosQ2: 0,
+      puntosQ3: 0,
+      puntosQ4: 0,
+      puntosOT: 0,
     },
   });
 };
@@ -1197,8 +1378,20 @@ export const recordBlock = async (gameId, playerId) => {
       tirosLibresIntentados: 0,
       tirosLibresAnotados: 0,
       perdidas: 0,
+      faltasPersonales: 0,
+      faltasQ1: 0,
+      faltasQ2: 0,
+      faltasQ3: 0,
+      faltasQ4: 0,
+      faltasOT: 0,
       minutos: 0,
       plusMinus: 0,
+      isStarter: false,
+      puntosQ1: 0,
+      puntosQ2: 0,
+      puntosQ3: 0,
+      puntosQ4: 0,
+      puntosOT: 0,
     },
   });
 };
@@ -1394,9 +1587,125 @@ export const recordTurnover = async (gameId, playerId) => {
       tirosLibresIntentados: 0,
       tirosLibresAnotados: 0,
       perdidas: 1,
+      faltasPersonales: 0,
+      faltasQ1: 0,
+      faltasQ2: 0,
+      faltasQ3: 0,
+      faltasQ4: 0,
+      faltasOT: 0,
       minutos: 0,
       plusMinus: 0,
+      isStarter: false,
+      puntosQ1: 0,
+      puntosQ2: 0,
+      puntosQ3: 0,
+      puntosQ4: 0,
+      puntosOT: 0,
     },
+  });
+};
+
+export const recordPersonalFoul = async (gameId, playerId) => {
+  return prisma.$transaction(async (tx) => {
+    // Validate that the game exists and is currently running
+    const game = await tx.game.findUnique({
+      where: { id: Number(gameId) },
+      include: {
+        activePlayers: true,
+      },
+    });
+
+    if (!game) {
+      throw new Error("Partido no encontrado");
+    }
+
+    if (game.estado !== "in_progress") {
+      throw new Error(
+        "No se pueden registrar estadísticas cuando el juego no está en progreso"
+      );
+    }
+
+    // Note: Players can commit fouls even when on the bench, so we don't check if they're active
+
+    // Determine which quarter we're in for fouls tracking
+    let quarterFoulsField = '';
+    if (game.isOvertime) {
+      quarterFoulsField = 'faltasOT';
+    } else {
+      switch (game.currentQuarter) {
+        case 1: quarterFoulsField = 'faltasQ1'; break;
+        case 2: quarterFoulsField = 'faltasQ2'; break;
+        case 3: quarterFoulsField = 'faltasQ3'; break;
+        case 4: quarterFoulsField = 'faltasQ4'; break;
+        default: quarterFoulsField = 'faltasOT'; break;
+      }
+    }
+
+    // Use upsert to either create or update, preserving existing values
+    const updatedPlayerStats = await tx.playerGameStats.upsert({
+      where: {
+        gameId_playerId: {
+          gameId: Number(gameId),
+          playerId: Number(playerId),
+        },
+      },
+      update: {
+        faltasPersonales: { increment: 1 },
+        [quarterFoulsField]: { increment: 1 },
+      },
+      create: {
+        gameId: Number(gameId),
+        playerId: Number(playerId),
+        puntos: 0,
+        rebotes: 0,
+        asistencias: 0,
+        robos: 0,
+        tapones: 0,
+        tirosIntentados: 0,
+        tirosAnotados: 0,
+        tiros3Intentados: 0,
+        tiros3Anotados: 0,
+        tirosLibresIntentados: 0,
+        tirosLibresAnotados: 0,
+        perdidas: 0,
+        faltasPersonales: 1,
+        faltasQ1: quarterFoulsField === 'faltasQ1' ? 1 : 0,
+        faltasQ2: quarterFoulsField === 'faltasQ2' ? 1 : 0,
+        faltasQ3: quarterFoulsField === 'faltasQ3' ? 1 : 0,
+        faltasQ4: quarterFoulsField === 'faltasQ4' ? 1 : 0,
+        faltasOT: quarterFoulsField === 'faltasOT' ? 1 : 0,
+        minutos: 0,
+        plusMinus: 0,
+        isStarter: false,
+        puntosQ1: 0,
+        puntosQ2: 0,
+        puntosQ3: 0,
+        puntosQ4: 0,
+        puntosOT: 0,
+      },
+    });
+
+    // Get player info for response
+    const player = await tx.player.findUnique({
+      where: { id: Number(playerId) },
+      include: { team: true },
+    });
+
+    return {
+      success: true,
+      foul: {
+        player: {
+          id: player.id,
+          name: `${player.nombre} ${player.apellido}`,
+          number: player.numero,
+          team: player.team.nombre,
+        },
+        quarter: game.isOvertime ? 'OT' : `Q${game.currentQuarter}`,
+        totalFouls: updatedPlayerStats.faltasPersonales,
+        description: `Falta personal de ${player.nombre} ${player.apellido} - Total: ${updatedPlayerStats.faltasPersonales} faltas`,
+      },
+      playerStats: updatedPlayerStats,
+    };
   });
 };
 

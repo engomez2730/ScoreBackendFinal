@@ -91,6 +91,18 @@ model PlayerGameStats {
   minutos          Int
   plusMinus        Int
   perdidas         Int     @default(0)
+  faltasPersonales Int     @default(0)      // Total personal fouls
+  faltasQ1         Int     @default(0)      // Personal fouls in Q1
+  faltasQ2         Int     @default(0)      // Personal fouls in Q2
+  faltasQ3         Int     @default(0)      // Personal fouls in Q3
+  faltasQ4         Int     @default(0)      // Personal fouls in Q4
+  faltasOT         Int     @default(0)      // Personal fouls in overtime
+  isStarter        Boolean @default(false)  // Track if player was a starter
+  puntosQ1         Int     @default(0)      // Points scored in Q1
+  puntosQ2         Int     @default(0)      // Points scored in Q2
+  puntosQ3         Int     @default(0)      // Points scored in Q3
+  puntosQ4         Int     @default(0)      // Points scored in Q4
+  puntosOT         Int     @default(0)      // Points scored in overtime
   game             Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
   player           Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
   

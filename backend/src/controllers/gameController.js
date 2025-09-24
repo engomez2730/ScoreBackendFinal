@@ -173,6 +173,29 @@ export const getGameStats = async (req, res) => {
   }
 };
 
+export const getGameStatsWithBreakdown = async (req, res) => {
+  try {
+    const breakdown = await gameService.getGameStatsWithBreakdown(req.params.id);
+    res.json(breakdown);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+export const setStartingPlayers = async (req, res) => {
+  try {
+    const { homeStarters, awayStarters } = req.body;
+    const result = await gameService.setStartingPlayers(
+      req.params.id,
+      homeStarters,
+      awayStarters
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 export const getActivePlayers = async (req, res) => {
   try {
     const game = await gameService.getGameById(req.params.id);
@@ -420,6 +443,17 @@ export const recordTurnover = async (req, res) => {
     const { playerId } = req.body;
     const gameId = req.params.id;
     const result = await gameService.recordTurnover(gameId, playerId);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+export const recordPersonalFoul = async (req, res) => {
+  try {
+    const { playerId } = req.body;
+    const gameId = req.params.id;
+    const result = await gameService.recordPersonalFoul(gameId, playerId);
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
