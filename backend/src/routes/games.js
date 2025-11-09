@@ -1,33 +1,131 @@
 import express from "express";
 import * as gameController from "../controllers/gameController.js";
+import {
+  authenticateToken,
+  optionalAuth,
+  checkTimeControlPermission,
+  checkGamePermissions,
+} from "../middleware/auth.js";
 
 const router = express.Router();
 
-router.get("/", gameController.getGames);
-router.get("/:id", gameController.getGame);
-router.post("/", gameController.createGame);
-router.put("/:id", gameController.updateGame);
-router.delete("/:id", gameController.deleteGame);
-router.delete("/", gameController.deleteAllGames);
-router.put("/:id/time", gameController.updateGameTime);
-router.post("/:id/reset-time", gameController.resetGameTime);
-router.put("/:id/score", gameController.updateScore);
-router.put("/:id/full-update", gameController.fullUpdateGame);
-router.get("/:id/stats", gameController.getGameStats);
-router.get("/:id/stats/breakdown", gameController.getGameStatsWithBreakdown);
-router.post("/:id/set-starters", gameController.setStartingPlayers);
-router.put("/:id/player-stats", gameController.updatePlayerStats);
-router.put("/:id/player-minutes", gameController.updatePlayerMinutes);
-router.put("/:id/player-plusminus", gameController.updatePlayerPlusMinus);
-router.get("/:id/active-players", gameController.getActivePlayers);
-router.get("/:id/bench-players", gameController.getBenchPlayers);
-router.get("/:id/bench-players/home", gameController.getHomeBenchPlayers);
-router.get("/:id/bench-players/away", gameController.getAwayBenchPlayers);
-router.put("/:id/active-players/home", gameController.updateHomeActivePlayers);
-router.put("/:id/active-players/away", gameController.updateAwayActivePlayers);
-router.post("/:id/substitution", gameController.makeSubstitution);
-router.post("/:id/record-shot", gameController.recordShot);
-router.post("/:id/record-rebound", gameController.recordRebound);
+// Rutas públicas/opcionales (para no romper funcionalidad existente)
+router.get("/", optionalAuth, gameController.getGames);
+router.get("/:id", optionalAuth, gameController.getGame);
+router.get("/:id/stats", optionalAuth, gameController.getGameStats);
+router.get(
+  "/:id/stats/breakdown",
+  optionalAuth,
+  gameController.getGameStatsWithBreakdown
+);
+router.get(
+  "/:id/active-players",
+  optionalAuth,
+  gameController.getActivePlayers
+);
+router.get("/:id/bench-players", optionalAuth, gameController.getBenchPlayers);
+router.get(
+  "/:id/bench-players/home",
+  optionalAuth,
+  gameController.getHomeBenchPlayers
+);
+router.get(
+  "/:id/bench-players/away",
+  optionalAuth,
+  gameController.getAwayBenchPlayers
+);
+
+// Rutas de creación/edición básica (requieren autenticación)
+router.post("/", authenticateToken, gameController.createGame);
+router.put("/:id", authenticateToken, gameController.updateGame);
+router.delete("/:id", authenticateToken, gameController.deleteGame);
+router.delete("/", authenticateToken, gameController.deleteAllGames);
+
+// Rutas críticas de control de tiempo (requieren permisos específicos)
+router.put(
+  "/:id/time",
+  authenticateToken,
+  checkTimeControlPermission,
+  gameController.updateGameTime
+);
+router.post(
+  "/:id/reset-time",
+  authenticateToken,
+  checkTimeControlPermission,
+  gameController.resetGameTime
+);
+
+// Rutas de sustituciones (requieren permisos específicos)
+router.post(
+  "/:id/substitution",
+  authenticateToken,
+  checkGamePermissions(["canMakeSubstitutions"]),
+  gameController.makeSubstitution
+);
+router.post(
+  "/:id/set-starters",
+  authenticateToken,
+  checkGamePermissions(["canSetStarters"]),
+  gameController.setStartingPlayers
+);
+router.put(
+  "/:id/active-players/home",
+  authenticateToken,
+  checkGamePermissions(["canMakeSubstitutions"]),
+  gameController.updateHomeActivePlayers
+);
+router.put(
+  "/:id/active-players/away",
+  authenticateToken,
+  checkGamePermissions(["canMakeSubstitutions"]),
+  gameController.updateAwayActivePlayers
+);
+
+// Rutas de estadísticas (requieren permisos específicos según el tipo)
+router.put(
+  "/:id/score",
+  authenticateToken,
+  checkGamePermissions(["canEditPoints"]),
+  gameController.updateScore
+);
+router.put(
+  "/:id/full-update",
+  authenticateToken,
+  checkTimeControlPermission,
+  gameController.fullUpdateGame
+);
+router.put(
+  "/:id/player-stats",
+  authenticateToken,
+  checkGamePermissions(["canEditPoints", "canEditRebounds", "canEditAssists"]),
+  gameController.updatePlayerStats
+);
+router.put(
+  "/:id/player-minutes",
+  authenticateToken,
+  checkTimeControlPermission,
+  gameController.updatePlayerMinutes
+);
+router.put(
+  "/:id/player-plusminus",
+  authenticateToken,
+  checkTimeControlPermission,
+  gameController.updatePlayerPlusMinus
+);
+
+// Rutas específicas de estadísticas (con permisos granulares)
+router.post(
+  "/:id/record-shot",
+  authenticateToken,
+  checkGamePermissions(["canEditShots"]),
+  gameController.recordShot
+);
+router.post(
+  "/:id/record-rebound",
+  authenticateToken,
+  checkGamePermissions(["canEditRebounds"]),
+  gameController.recordRebound
+);
 router.post("/:id/record-assist", gameController.recordAssist);
 router.post("/:id/record-steal", gameController.recordSteal);
 router.post("/:id/record-block", gameController.recordBlock);

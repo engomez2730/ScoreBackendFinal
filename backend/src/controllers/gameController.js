@@ -38,13 +38,20 @@ export const getGame = async (req, res) => {
 export const createGame = async (req, res) => {
   const { eventId, teamHomeId, teamAwayId, fecha, estado } = req.body;
   try {
-    const game = await gameService.createGame({
+    const gameData = {
       eventId,
       teamHomeId,
       teamAwayId,
       fecha: new Date(fecha),
       estado,
-    });
+    };
+
+    // Si hay un usuario autenticado, asignarlo como creador
+    if (req.user) {
+      gameData.createdBy = req.user.id;
+    }
+
+    const game = await gameService.createGame(gameData);
     res.status(201).json(game);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -175,7 +182,9 @@ export const getGameStats = async (req, res) => {
 
 export const getGameStatsWithBreakdown = async (req, res) => {
   try {
-    const breakdown = await gameService.getGameStatsWithBreakdown(req.params.id);
+    const breakdown = await gameService.getGameStatsWithBreakdown(
+      req.params.id
+    );
     res.json(breakdown);
   } catch (error) {
     res.status(400).json({ error: error.message });
