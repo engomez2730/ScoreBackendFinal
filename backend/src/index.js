@@ -3,6 +3,7 @@ import playerGameStatsRouter from "./routes/playerGameStats.js";
 import gamesRouter from "./routes/games.js";
 import authRouter from "./routes/auth.js";
 import userGameRouter from "./routes/userGame.js";
+import usersRouter from "./routes/users.js";
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
@@ -29,6 +30,7 @@ app.use(express.json());
 
 // API Routes with /api prefix
 app.use("/api/auth", authRouter);
+app.use("/api/users", usersRouter);
 app.use("/api/user-game", userGameRouter);
 app.use("/api/players", playersRouter);
 app.use("/api/teams", teamsRouter);

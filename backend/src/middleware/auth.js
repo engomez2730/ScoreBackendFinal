@@ -201,18 +201,11 @@ const checkRolePermissions = (userRole, requiredPermissions) => {
     ADMIN: ["*"], // Todos los permisos - puede hacer cualquier cosa
     REBOUNDER_ASSISTS: [
       "canEditRebounds",
-      "canEditAssists", 
-      "canEditTurnovers"
+      "canEditAssists",
+      "canEditTurnovers",
     ],
-    STEALS_BLOCKS: [
-      "canEditSteals",
-      "canEditBlocks"
-    ],
-    SCORER: [
-      "canEditPoints", 
-      "canEditShots", 
-      "canEditFreeThrows"
-    ],
+    STEALS_BLOCKS: ["canEditSteals", "canEditBlocks"],
+    SCORER: ["canEditPoints", "canEditShots", "canEditFreeThrows"],
     ALL_AROUND: [
       "canEditPoints",
       "canEditRebounds",
@@ -222,7 +215,7 @@ const checkRolePermissions = (userRole, requiredPermissions) => {
       "canEditTurnovers",
       "canEditShots",
       "canEditFreeThrows",
-      "canEditPersonalFouls"
+      "canEditPersonalFouls",
       // NO incluye canControlTime - no puede manejar tiempo
     ],
   };

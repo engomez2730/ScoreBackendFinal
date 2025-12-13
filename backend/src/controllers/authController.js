@@ -81,7 +81,7 @@ export const register = async (req, res) => {
       "USER",
       "ADMIN",
       "REBOUNDER_ASSISTS",
-      "STEALS_BLOCKS", 
+      "STEALS_BLOCKS",
       "SCORER",
       "ALL_AROUND",
     ];
@@ -96,7 +96,8 @@ export const register = async (req, res) => {
           REBOUNDER_ASSISTS: "Puede anotar rebotes, asistencias y pérdidas",
           STEALS_BLOCKS: "Puede anotar robos y tapones",
           SCORER: "Puede anotar puntos, tiros de campo y triples",
-          ALL_AROUND: "Puede anotar cualquier estadística excepto controlar tiempo",
+          ALL_AROUND:
+            "Puede anotar cualquier estadística excepto controlar tiempo",
         },
       });
     }

@@ -4,14 +4,14 @@
 
 ### **Roles Disponibles:**
 
-| Rol                  | Descripción                    | Permisos Específicos                                          |
-| -------------------- | ------------------------------ | ------------------------------------------------------------- |
-| `ADMIN`              | Administrador general          | ✅ **TODOS** los permisos en todos los juegos                |
-| `REBOUNDER_ASSISTS`  | Rebotes y Asistencias         | ✅ Rebotes, Asistencias, Pérdidas de balón                   |
-| `STEALS_BLOCKS`      | Robos y Bloqueos              | ✅ Robos, Bloqueos/Tapones                                   |
-| `SCORER`             | Anotador de puntos            | ✅ Puntos, Tiros de campo, Triples, Tiros libres             |
-| `ALL_AROUND`         | Todas las estadísticas        | ✅ Todas las estadísticas **EXCEPTO** control de tiempo      |
-| `USER`               | Usuario básico                 | ✅ Solo permisos asignados específicamente por el admin       |
+| Rol                 | Descripción            | Permisos Específicos                                    |
+| ------------------- | ---------------------- | ------------------------------------------------------- |
+| `ADMIN`             | Administrador general  | ✅ **TODOS** los permisos en todos los juegos           |
+| `REBOUNDER_ASSISTS` | Rebotes y Asistencias  | ✅ Rebotes, Asistencias, Pérdidas de balón              |
+| `STEALS_BLOCKS`     | Robos y Bloqueos       | ✅ Robos, Bloqueos/Tapones                              |
+| `SCORER`            | Anotador de puntos     | ✅ Puntos, Tiros de campo, Triples, Tiros libres        |
+| `ALL_AROUND`        | Todas las estadísticas | ✅ Todas las estadísticas **EXCEPTO** control de tiempo |
+| `USER`              | Usuario básico         | ✅ Solo permisos asignados específicamente por el admin |
 
 ---
 
