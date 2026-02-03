@@ -10,10 +10,10 @@
   "scripts": {
     "dev": "nodemon --watch src src/index.js",
     "start": "node src/index.js",
-    "build": "node node_modules/.bin/prisma generate",
-    "postinstall": "node node_modules/.bin/prisma generate",
+    "build": "npm exec prisma generate",
+    "postinstall": "npm exec prisma generate",
     "prisma": "prisma",
-    "deploy": "node node_modules/.bin/prisma generate && node node_modules/.bin/prisma db push"
+    "deploy": "npm exec prisma generate && npm exec prisma db push"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",
