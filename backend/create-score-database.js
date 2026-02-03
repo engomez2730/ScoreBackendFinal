@@ -3,17 +3,17 @@ const { Client } = pkg;
 
 async function createScoreDatabase() {
   const client = new Client({
-    host: 'postgres273014.postgres.database.azure.com',
-    port: 5432,
+    host: 'metro.proxy.rlwy.net',
+    port: 45750,
     user: 'postgres',
-    password: 'Elsa273014!',
-    database: 'postgres',
+    password: 'lcHRaHbcDJQsjyrNbjooohLcamvHzBVv',
+    database: 'railway',
     ssl: { rejectUnauthorized: false }
   });
 
   try {
     await client.connect();
-    console.log('✅ Connected to Azure PostgreSQL');
+    console.log('✅ Connected to Railway PostgreSQL');
     
     // Check if database exists
     const checkDb = await client.query(
