@@ -1,3 +1,6 @@
+import * as gameService from "../services/gameService.js";
+import { io } from "../index.js";
+
 export const fullUpdateGame = async (req, res) => {
   try {
     const gameId = req.params.id;
@@ -17,12 +20,21 @@ export const fullUpdateGame = async (req, res) => {
       gameTime,
       playerStats,
     });
+    io.to(`game_${gameId}`).emit("gameUpdated", {
+      gameId,
+      homeScore,
+      awayScore,
+      currentQuarter,
+      quarterTime,
+      gameTime,
+      playerStats,
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 };
-import * as gameService from "../services/gameService.js";
 
 export const getGames = async (req, res) => {
   const games = await gameService.getAllGames();
@@ -104,6 +116,11 @@ export const updateGameTime = async (req, res) => {
   const { gameTime } = req.body;
   try {
     const game = await gameService.updateGameTime(req.params.id, gameTime);
+    io.to(`game_${req.params.id}`).emit("timeUpdated", {
+      gameId: req.params.id,
+      gameTime,
+      timestamp: new Date(),
+    });
     res.json(game);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -113,6 +130,11 @@ export const updateGameTime = async (req, res) => {
 export const resetGameTime = async (req, res) => {
   try {
     const game = await gameService.updateGameTime(req.params.id, 0);
+    io.to(`game_${req.params.id}`).emit("clockReset", {
+      gameId: req.params.id,
+      gameTime: 0,
+      timestamp: new Date(),
+    });
     res.json(game);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -127,6 +149,12 @@ export const updateScore = async (req, res) => {
       homeScore,
       awayScore
     );
+    io.to(`game_${req.params.id}`).emit("scoreUpdated", {
+      gameId: req.params.id,
+      homeScore,
+      awayScore,
+      timestamp: new Date(),
+    });
     res.json(game);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -141,6 +169,13 @@ export const updatePlayerStats = async (req, res) => {
       playerId,
       stats
     );
+    io.to(`game_${req.params.id}`).emit("statsUpdated", {
+      gameId: req.params.id,
+      playerId,
+      stats: playerStats,
+      statType: "multiple",
+      timestamp: new Date(),
+    });
     res.json(playerStats);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -153,6 +188,12 @@ export const updatePlayerMinutes = async (req, res) => {
       req.params.id,
       req.body
     );
+    io.to(`game_${req.params.id}`).emit("statsUpdated", {
+      gameId: req.params.id,
+      stats: result,
+      statType: "minutes",
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -165,6 +206,12 @@ export const updatePlayerPlusMinus = async (req, res) => {
       req.params.id,
       req.body
     );
+    io.to(`game_${req.params.id}`).emit("statsUpdated", {
+      gameId: req.params.id,
+      stats: result,
+      statType: "plusMinus",
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -199,6 +246,12 @@ export const setStartingPlayers = async (req, res) => {
       homeStarters,
       awayStarters
     );
+    io.to(`game_${req.params.id}`).emit("startersSet", {
+      gameId: req.params.id,
+      homeStarters,
+      awayStarters,
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -238,6 +291,12 @@ export const updateHomeActivePlayers = async (req, res) => {
       playerIds,
       "home"
     );
+    io.to(`game_${req.params.id}`).emit("activePlayersUpdated", {
+      gameId: req.params.id,
+      team: "home",
+      playerIds,
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -264,6 +323,12 @@ export const updateAwayActivePlayers = async (req, res) => {
       playerIds,
       "away"
     );
+    io.to(`game_${req.params.id}`).emit("activePlayersUpdated", {
+      gameId: req.params.id,
+      team: "away",
+      playerIds,
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -320,6 +385,13 @@ export const makeSubstitution = async (req, res) => {
       playerOutId,
       gameTime
     );
+    io.to(`game_${req.params.id}`).emit("substitutionMade", {
+      gameId: req.params.id,
+      playerInId,
+      playerOutId,
+      gameTime,
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -342,6 +414,15 @@ export const recordShot = async (req, res) => {
       gameTime,
       playersOnCourt
     );
+    io.to(`game_${req.params.id}`).emit("statsUpdated", {
+      gameId: req.params.id,
+      playerId,
+      stats: result,
+      statType: "shots",
+      shotType,
+      made,
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -352,6 +433,13 @@ export const recordRebound = async (req, res) => {
   const { playerId } = req.body;
   try {
     const result = await gameService.recordRebound(req.params.id, playerId);
+    io.to(`game_${req.params.id}`).emit("statsUpdated", {
+      gameId: req.params.id,
+      playerId,
+      stats: result,
+      statType: "rebounds",
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -362,6 +450,13 @@ export const recordOffensiveRebound = async (req, res) => {
   const { playerId } = req.body;
   try {
     const result = await gameService.recordOffensiveRebound(req.params.id, playerId);
+    io.to(`game_${req.params.id}`).emit("statsUpdated", {
+      gameId: req.params.id,
+      playerId,
+      stats: result,
+      statType: "offensiveRebounds",
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -372,6 +467,13 @@ export const recordAssist = async (req, res) => {
   const { playerId } = req.body;
   try {
     const result = await gameService.recordAssist(req.params.id, playerId);
+    io.to(`game_${req.params.id}`).emit("statsUpdated", {
+      gameId: req.params.id,
+      playerId,
+      stats: result,
+      statType: "assists",
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -382,6 +484,13 @@ export const recordSteal = async (req, res) => {
   const { playerId } = req.body;
   try {
     const result = await gameService.recordSteal(req.params.id, playerId);
+    io.to(`game_${req.params.id}`).emit("statsUpdated", {
+      gameId: req.params.id,
+      playerId,
+      stats: result,
+      statType: "steals",
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -392,6 +501,13 @@ export const recordBlock = async (req, res) => {
   const { playerId } = req.body;
   try {
     const result = await gameService.recordBlock(req.params.id, playerId);
+    io.to(`game_${req.params.id}`).emit("statsUpdated", {
+      gameId: req.params.id,
+      playerId,
+      stats: result,
+      statType: "blocks",
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -415,6 +531,12 @@ export const updateGameSettings = async (req, res) => {
 export const nextQuarter = async (req, res) => {
   try {
     const result = await gameService.nextQuarter(req.params.id);
+    io.to(`game_${req.params.id}`).emit("quarterChanged", {
+      gameId: req.params.id,
+      currentQuarter: result.currentQuarter,
+      isOvertime: result.isOvertime,
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -428,6 +550,11 @@ export const updateQuarterTime = async (req, res) => {
       req.params.id,
       quarterTime
     );
+    io.to(`game_${req.params.id}`).emit("quarterTimeUpdated", {
+      gameId: req.params.id,
+      quarterTime,
+      timestamp: new Date(),
+    });
     res.json(game);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -462,6 +589,13 @@ export const recordTurnover = async (req, res) => {
     const { playerId } = req.body;
     const gameId = req.params.id;
     const result = await gameService.recordTurnover(gameId, playerId);
+    io.to(`game_${gameId}`).emit("statsUpdated", {
+      gameId,
+      playerId,
+      stats: result,
+      statType: "turnovers",
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -473,6 +607,13 @@ export const recordPersonalFoul = async (req, res) => {
     const { playerId } = req.body;
     const gameId = req.params.id;
     const result = await gameService.recordPersonalFoul(gameId, playerId);
+    io.to(`game_${gameId}`).emit("statsUpdated", {
+      gameId,
+      playerId,
+      stats: result,
+      statType: "fouls",
+      timestamp: new Date(),
+    });
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
