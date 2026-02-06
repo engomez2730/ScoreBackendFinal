@@ -9,29 +9,31 @@ import {
 
 const router = express.Router();
 
-// Rutas públicas/opcionales (para no romper funcionalidad existente)
-router.get("/", optionalAuth, gameController.getGames);
-router.get("/:id", optionalAuth, gameController.getGame);
+// Ruta pública - Solo stats es accesible sin autenticación
 router.get("/:id/stats", optionalAuth, gameController.getGameStats);
+
+// Rutas protegidas - Requieren autenticación
+router.get("/", authenticateToken, gameController.getGames);
+router.get("/:id", authenticateToken, gameController.getGame);
 router.get(
   "/:id/stats/breakdown",
-  optionalAuth,
+  authenticateToken,
   gameController.getGameStatsWithBreakdown
 );
 router.get(
   "/:id/active-players",
-  optionalAuth,
+  authenticateToken,
   gameController.getActivePlayers
 );
-router.get("/:id/bench-players", optionalAuth, gameController.getBenchPlayers);
+router.get("/:id/bench-players", authenticateToken, gameController.getBenchPlayers);
 router.get(
   "/:id/bench-players/home",
-  optionalAuth,
+  authenticateToken,
   gameController.getHomeBenchPlayers
 );
 router.get(
   "/:id/bench-players/away",
-  optionalAuth,
+  authenticateToken,
   gameController.getAwayBenchPlayers
 );
 
