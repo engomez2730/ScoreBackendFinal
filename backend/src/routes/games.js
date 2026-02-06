@@ -126,6 +126,12 @@ router.post(
   checkGamePermissions(["canEditRebounds"]),
   gameController.recordRebound
 );
+router.post(
+  "/:id/record-offensive-rebound",
+  authenticateToken,
+  checkGamePermissions(["canEditRebounds"]),
+  gameController.recordOffensiveRebound
+);
 router.post("/:id/record-assist", gameController.recordAssist);
 router.post("/:id/record-steal", gameController.recordSteal);
 router.post("/:id/record-block", gameController.recordBlock);

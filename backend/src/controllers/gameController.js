@@ -358,6 +358,16 @@ export const recordRebound = async (req, res) => {
   }
 };
 
+export const recordOffensiveRebound = async (req, res) => {
+  const { playerId } = req.body;
+  try {
+    const result = await gameService.recordOffensiveRebound(req.params.id, playerId);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 export const recordAssist = async (req, res) => {
   const { playerId } = req.body;
   try {

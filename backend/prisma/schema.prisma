@@ -93,6 +93,7 @@ model PlayerGameStats {
   playerId         Int
   puntos           Int
   rebotes          Int
+  rebotesOfensivos Int     @default(0)  // Offensive rebounds
   asistencias      Int
   robos            Int
   tapones          Int

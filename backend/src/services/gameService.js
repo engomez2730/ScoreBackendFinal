@@ -1175,6 +1175,84 @@ export const recordRebound = async (gameId, playerId) => {
   });
 };
 
+export const recordOffensiveRebound = async (gameId, playerId) => {
+  // Get game with active players to validate
+  const game = await prisma.game.findUnique({
+    where: { id: Number(gameId) },
+    include: {
+      activePlayers: true,
+    },
+  });
+
+  if (!game) {
+    throw new Error("Juego no encontrado");
+  }
+
+  // Check if game is running (estado should be 'in_progress')
+  if (game.estado !== "in_progress") {
+    throw new Error(
+      "No se pueden registrar estadísticas cuando el juego no está en progreso"
+    );
+  }
+
+  // Check if player is on the court (in active players)
+  const isPlayerActive = game.activePlayers.some(
+    (p) => p.id === Number(playerId)
+  );
+
+  if (!isPlayerActive) {
+    throw new Error(
+      "No se pueden registrar estadísticas para jugadores que están en el banquillo"
+    );
+  }
+
+  // Use upsert to either create or update, preserving existing values
+  // Offensive rebound counts as both an offensive rebound AND a total rebound
+  return prisma.playerGameStats.upsert({
+    where: {
+      gameId_playerId: {
+        gameId: Number(gameId),
+        playerId: Number(playerId),
+      },
+    },
+    update: {
+      rebotes: { increment: 1 },
+      rebotesOfensivos: { increment: 1 },
+    },
+    create: {
+      gameId: Number(gameId),
+      playerId: Number(playerId),
+      puntos: 0,
+      rebotes: 1,
+      rebotesOfensivos: 1,
+      asistencias: 0,
+      robos: 0,
+      tapones: 0,
+      tirosIntentados: 0,
+      tirosAnotados: 0,
+      tiros3Intentados: 0,
+      tiros3Anotados: 0,
+      tirosLibresIntentados: 0,
+      tirosLibresAnotados: 0,
+      perdidas: 0,
+      faltasPersonales: 0,
+      faltasQ1: 0,
+      faltasQ2: 0,
+      faltasQ3: 0,
+      faltasQ4: 0,
+      faltasOT: 0,
+      minutos: 0,
+      plusMinus: 0,
+      isStarter: false,
+      puntosQ1: 0,
+      puntosQ2: 0,
+      puntosQ3: 0,
+      puntosQ4: 0,
+      puntosOT: 0,
+    },
+  });
+};
+
 export const recordAssist = async (gameId, playerId) => {
   // Validate that the game exists and is currently running
   const game = await prisma.game.findUnique({
