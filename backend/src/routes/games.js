@@ -12,9 +12,9 @@ const router = express.Router();
 // Ruta pública - Solo stats es accesible sin autenticación
 router.get("/:id/stats", optionalAuth, gameController.getGameStats);
 
-// Rutas protegidas - Requieren autenticación
-router.get("/", authenticateToken, gameController.getGames);
-router.get("/:id", authenticateToken, gameController.getGame);
+// Rutas públicas
+router.get("/", gameController.getGames);
+router.get("/:id", gameController.getGame);
 router.get(
   "/:id/stats/breakdown",
   authenticateToken,
@@ -37,10 +37,10 @@ router.get(
   gameController.getAwayBenchPlayers
 );
 
-// Rutas de creación/edición básica (requieren autenticación)
-router.post("/", authenticateToken, gameController.createGame);
-router.put("/:id", authenticateToken, gameController.updateGame);
-router.delete("/:id", authenticateToken, gameController.deleteGame);
+// Rutas de creación/edición básica (públicas)
+router.post("/", gameController.createGame);
+router.put("/:id", gameController.updateGame);
+router.delete("/:id", gameController.deleteGame);
 router.delete("/", authenticateToken, gameController.deleteAllGames);
 
 // Rutas críticas de control de tiempo (requieren permisos específicos)
