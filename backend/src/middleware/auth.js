@@ -1,6 +1,5 @@
 import jwt from "jsonwebtoken";
-import pkg from "@prisma/client";
-const { PrismaClient } = pkg;
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "basketball-stats-secret-key";

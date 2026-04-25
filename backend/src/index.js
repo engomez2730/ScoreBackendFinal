@@ -8,8 +8,7 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
-import pkg from "@prisma/client";
-const { PrismaClient } = pkg;
+import { PrismaClient } from "@prisma/client";
 import playersRouter from "./routes/players.js";
 import teamsRouter from "./routes/teams.js";
 import eventsRouter from "./routes/events.js";
@@ -433,6 +432,3 @@ const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
-
-// Export io instance for use in controllers
-export { io };
