@@ -25,6 +25,9 @@ const io = new Server(server, {
 
 const prisma = new PrismaClient();
 
+// Export io for use in controllers
+export { io };
+
 app.use(cors());
 app.use(express.json());
 

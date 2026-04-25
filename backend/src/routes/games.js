@@ -20,9 +20,9 @@ router.get(
   authenticateToken,
   gameController.getGameStatsWithBreakdown
 );
+// Endpoint PÚBLICO - cualquier usuario puede ver jugadores activos
 router.get(
   "/:id/active-players",
-  authenticateToken,
   gameController.getActivePlayers
 );
 router.get("/:id/bench-players", authenticateToken, gameController.getBenchPlayers);
@@ -81,6 +81,12 @@ router.put(
   authenticateToken,
   checkGamePermissions(["canMakeSubstitutions"]),
   gameController.updateAwayActivePlayers
+);
+router.put(
+  "/:id/active-players",
+  authenticateToken,
+  checkGamePermissions(["canMakeSubstitutions"]),
+  gameController.updateAllActivePlayers
 );
 
 // Rutas de estadísticas (requieren permisos específicos según el tipo)

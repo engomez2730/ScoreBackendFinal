@@ -509,13 +509,24 @@ export const getActivePlayers = async (id) => {
     (player) => player.teamId === game.teamAwayId
   );
 
+  console.log('✅ Returning active players:', {
+    home: homePlayers.length,
+    away: awayPlayers.length,
+    homeIds: homePlayers.map(p => p.id),
+    awayIds: awayPlayers.map(p => p.id)
+  });
+
   return {
     homeTeam: {
-      name: game.teamHome.nombre,
+      id: game.teamHome.id,
+      nombre: game.teamHome.nombre,
+      logo: game.teamHome.logo,
       players: homePlayers,
     },
     awayTeam: {
-      name: game.teamAway.nombre,
+      id: game.teamAway.id,
+      nombre: game.teamAway.nombre,
+      logo: game.teamAway.logo,
       players: awayPlayers,
     },
   };
@@ -608,6 +619,85 @@ export const updateTeamActivePlayers = async (id, playerIds, teamType) => {
         id: updatedGame.teamAwayId,
         name: updatedGame.teamAway.nombre,
         players: awayPlayers,
+      },
+    };
+  });
+};
+
+export const updateAllActivePlayers = async (gameId, playerIds) => {
+  return prisma.$transaction(async (tx) => {
+    // Validate game exists
+    const game = await tx.game.findUnique({
+      where: { id: Number(gameId) },
+      include: {
+        teamHome: true,
+        teamAway: true,
+      },
+    });
+
+    if (!game) {
+      throw new Error("Juego no encontrado");
+    }
+
+    // Validate exactly 10 players
+    if (playerIds.length !== 10) {
+      throw new Error("Se requieren exactamente 10 jugadores activos (5 por equipo)");
+    }
+
+    // Separate players by team (first 5 home, last 5 away)
+    const homePlayers = playerIds.slice(0, 5);
+    const awayPlayers = playerIds.slice(5, 10);
+
+    // Verify home players belong to home team
+    const homePlayerRecords = await tx.player.findMany({
+      where: {
+        id: { in: homePlayers.map(id => Number(id)) },
+        teamId: game.teamHomeId,
+      },
+    });
+
+    if (homePlayerRecords.length !== 5) {
+      throw new Error("Los primeros 5 jugadores deben pertenecer al equipo local");
+    }
+
+    // Verify away players belong to away team
+    const awayPlayerRecords = await tx.player.findMany({
+      where: {
+        id: { in: awayPlayers.map(id => Number(id)) },
+        teamId: game.teamAwayId,
+      },
+    });
+
+    if (awayPlayerRecords.length !== 5) {
+      throw new Error("Los últimos 5 jugadores deben pertenecer al equipo visitante");
+    }
+
+    // Update active players
+    const updatedGame = await tx.game.update({
+      where: { id: Number(gameId) },
+      data: {
+        activePlayers: {
+          set: playerIds.map((id) => ({ id: Number(id) })),
+        },
+      },
+      include: {
+        activePlayers: true,
+        teamHome: true,
+        teamAway: true,
+      },
+    });
+
+    console.log('✅ Updated all active players:', {
+      home: homePlayers,
+      away: awayPlayers,
+      total: playerIds.length
+    });
+
+    return {
+      success: true,
+      activePlayers: {
+        home: homePlayers,
+        away: awayPlayers,
       },
     };
   });
@@ -1845,11 +1935,24 @@ export const startGame = async (gameId, activePlayerIds, gameSettings) => {
       });
     }
 
+    // Separate players for logging
+    const homePlayers = activePlayerIds.slice(0, 5);
+    const awayPlayers = activePlayerIds.slice(5, 10);
+
+    console.log('✅ Game started with active players:', {
+      home: homePlayers,
+      away: awayPlayers,
+      total: activePlayerIds.length
+    });
+
     return {
       success: true,
       message: "Juego iniciado correctamente",
       game: updatedGame,
-      activePlayers: updatedGame.activePlayers,
+      activePlayers: {
+        home: homePlayers,
+        away: awayPlayers
+      },
       gameSettings: {
         quarterLength: updatedGame.quarterLength,
         totalQuarters: updatedGame.totalQuarters,

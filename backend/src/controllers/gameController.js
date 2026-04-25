@@ -335,6 +335,38 @@ export const updateAwayActivePlayers = async (req, res) => {
   }
 };
 
+export const updateAllActivePlayers = async (req, res) => {
+  const { playerIds } = req.body;
+  try {
+    if (!playerIds || !Array.isArray(playerIds)) {
+      return res
+        .status(400)
+        .json({ error: "Se requiere un array de IDs de jugadores" });
+    }
+
+    if (playerIds.length !== 10) {
+      return res
+        .status(400)
+        .json({ error: "Se requieren exactamente 10 jugadores activos (5 por equipo)" });
+    }
+
+    const result = await gameService.updateAllActivePlayers(
+      req.params.id,
+      playerIds
+    );
+
+    io.to(`game_${req.params.id}`).emit("activePlayersUpdated", {
+      gameId: req.params.id,
+      playerIds,
+      timestamp: new Date(),
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 export const getBenchPlayers = async (req, res) => {
   try {
     const benchPlayers = await gameService.getBenchPlayers(req.params.id);
