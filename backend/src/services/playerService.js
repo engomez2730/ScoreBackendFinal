@@ -45,5 +45,12 @@ export const updatePlayer = async (id, data) => {
 };
 
 export const deletePlayer = async (id) => {
-  return prisma.player.delete({ where: { id: Number(id) } });
+  const playerId = Number(id);
+  return prisma.$transaction([
+    prisma.playerGameStats.deleteMany({ where: { playerId } }),
+    prisma.substitution.deleteMany({
+      where: { OR: [{ playerInId: playerId }, { playerOutId: playerId }] },
+    }),
+    prisma.player.delete({ where: { id: playerId } }),
+  ]);
 };
