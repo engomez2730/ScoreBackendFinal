@@ -56,6 +56,18 @@ router.post(
   checkTimeControlPermission,
   gameController.resetGameTime
 );
+router.post(
+  "/:id/clock/start",
+  authenticateToken,
+  checkTimeControlPermission,
+  gameController.startClock
+);
+router.post(
+  "/:id/clock/pause",
+  authenticateToken,
+  checkTimeControlPermission,
+  gameController.pauseClock
+);
 
 // Rutas de sustituciones (requieren permisos específicos)
 router.post(

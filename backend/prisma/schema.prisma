@@ -74,7 +74,14 @@ model Game {
   overtimeLength    Int     @default(300)     // Overtime length in seconds (5 minutes = 300 seconds)
   quarterTime       Int     @default(0)       // Current quarter time in seconds
   isOvertime        Boolean @default(false)   // Is game in overtime
-  
+
+  // Server-authoritative clock state. The backend, not any individual client,
+  // decides whether the clock is running and computes elapsed playing time —
+  // this is what lets multiple connected devices/roles share one true clock
+  // instead of each running its own independent timer.
+  isClockRunning    Boolean   @default(false)
+  clockStartedAt    DateTime?
+
   // Información del creador del juego
   createdBy         Int?                      // ID del usuario que creó el juego
   
@@ -117,6 +124,7 @@ model PlayerGameStats {
   puntosQ3         Int     @default(0)      // Points scored in Q3
   puntosQ4         Int     @default(0)      // Points scored in Q4
   puntosOT         Int     @default(0)      // Points scored in overtime
+  rebotesOfensivos Int     @default(0)      // Offensive rebounds (already live in the DB; was missing from this schema file)
   game             Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
   player           Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
   

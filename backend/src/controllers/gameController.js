@@ -141,6 +141,38 @@ export const resetGameTime = async (req, res) => {
   }
 };
 
+export const startClock = async (req, res) => {
+  try {
+    const game = await gameService.startClock(req.params.id);
+    io.to(`game_${req.params.id}`).emit("clockStarted", {
+      gameId: req.params.id,
+      isClockRunning: true,
+      clockStartedAt: game.clockStartedAt,
+      gameTime: game.gameTime,
+      timestamp: new Date(),
+    });
+    res.json(game);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+export const pauseClock = async (req, res) => {
+  try {
+    const result = await gameService.pauseClock(req.params.id);
+    io.to(`game_${req.params.id}`).emit("clockPaused", {
+      gameId: req.params.id,
+      isClockRunning: false,
+      gameTime: result.game.gameTime,
+      elapsedSeconds: result.elapsedSeconds,
+      timestamp: new Date(),
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 export const updateScore = async (req, res) => {
   const { homeScore, awayScore } = req.body;
   try {

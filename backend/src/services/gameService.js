@@ -115,6 +115,128 @@ export const updateGameTime = async (id, gameTime) => {
   });
 };
 
+// Credits real elapsed clock time (since game.clockStartedAt) to every on-court
+// player's `minutos`, computed from the server's own clock — never trusts a
+// client's timer. Callers decide how to fold the returned seconds into
+// game.gameTime (or discard them, e.g. when the game just ended).
+//
+// Uses one bulk updateMany for the common case (every active player already
+// has a stats row) instead of one upsert per player — this runs inside a
+// transaction alongside a substitution, and N sequential round-trips to a
+// remote DB can blow past Prisma's interactive-transaction timeout.
+const flushClockTime = async (tx, game) => {
+  if (!game.isClockRunning || !game.clockStartedAt) {
+    return 0;
+  }
+
+  const elapsedMs = Date.now() - new Date(game.clockStartedAt).getTime();
+  const elapsedSeconds = Math.max(0, Math.round(elapsedMs / 1000));
+
+  if (elapsedSeconds === 0 || game.activePlayers.length === 0) {
+    return elapsedSeconds;
+  }
+
+  const playerIds = game.activePlayers.map((p) => p.id);
+
+  const { count } = await tx.playerGameStats.updateMany({
+    where: { gameId: game.id, playerId: { in: playerIds } },
+    data: { minutos: { increment: elapsedSeconds } },
+  });
+
+  // Rare path: a player who's never had a stats row created yet (e.g. a
+  // starter who hasn't touched the ball). updateMany silently skips these.
+  if (count < playerIds.length) {
+    const existing = await tx.playerGameStats.findMany({
+      where: { gameId: game.id, playerId: { in: playerIds } },
+      select: { playerId: true },
+    });
+    const existingIds = new Set(existing.map((s) => s.playerId));
+    const missingIds = playerIds.filter((id) => !existingIds.has(id));
+
+    for (const playerId of missingIds) {
+      await tx.playerGameStats.create({
+        data: {
+          gameId: game.id,
+          playerId,
+          puntos: 0,
+          rebotes: 0,
+          asistencias: 0,
+          robos: 0,
+          tapones: 0,
+          tirosIntentados: 0,
+          tirosAnotados: 0,
+          tiros3Intentados: 0,
+          tiros3Anotados: 0,
+          tirosLibresIntentados: 0,
+          tirosLibresAnotados: 0,
+          perdidas: 0,
+          minutos: elapsedSeconds,
+          plusMinus: 0,
+          isStarter: false,
+          puntosQ1: 0,
+          puntosQ2: 0,
+          puntosQ3: 0,
+          puntosQ4: 0,
+          puntosOT: 0,
+        },
+      });
+    }
+  }
+
+  return elapsedSeconds;
+};
+
+export const startClock = async (gameId) => {
+  const game = await prisma.game.findUnique({ where: { id: Number(gameId) } });
+
+  if (!game) {
+    throw new Error("Juego no encontrado");
+  }
+
+  if (game.estado !== "in_progress") {
+    throw new Error(
+      "El reloj solo puede iniciarse cuando el juego está en progreso"
+    );
+  }
+
+  if (game.isClockRunning) {
+    // Another device already started it — idempotent no-op instead of a second,
+    // competing clockStartedAt timestamp.
+    return game;
+  }
+
+  return prisma.game.update({
+    where: { id: Number(gameId) },
+    data: { isClockRunning: true, clockStartedAt: new Date() },
+  });
+};
+
+export const pauseClock = async (gameId) => {
+  return prisma.$transaction(async (tx) => {
+    const game = await tx.game.findUnique({
+      where: { id: Number(gameId) },
+      include: { activePlayers: true },
+    });
+
+    if (!game) {
+      throw new Error("Juego no encontrado");
+    }
+
+    const elapsedSeconds = await flushClockTime(tx, game);
+
+    const updatedGame = await tx.game.update({
+      where: { id: Number(gameId) },
+      data: {
+        isClockRunning: false,
+        clockStartedAt: null,
+        gameTime: game.gameTime + elapsedSeconds,
+      },
+    });
+
+    return { game: updatedGame, elapsedSeconds };
+  }, { timeout: 10000 });
+};
+
 export const setStartingPlayers = async (
   gameId,
   homeStarters,
@@ -892,6 +1014,21 @@ export const makeSubstitution = async (
       );
     }
 
+    // Checkpoint the elapsed clock time onto the CURRENT lineup before it
+    // changes. Without this, a stint that spans a substitution would credit
+    // the whole elapsed time to whoever happens to be active when the clock
+    // is eventually paused — including the player who just subbed in.
+    const elapsedSeconds = await flushClockTime(tx, game);
+    if (elapsedSeconds > 0) {
+      await tx.game.update({
+        where: { id: Number(gameId) },
+        data: {
+          gameTime: game.gameTime + elapsedSeconds,
+          clockStartedAt: new Date(),
+        },
+      });
+    }
+
     // Record substitution
     const substitution = await tx.substitution.create({
       data: {
@@ -926,7 +1063,7 @@ export const makeSubstitution = async (
       activePlayers: updatedGame.activePlayers,
       message: `Sustitución exitosa: ${playerIn.nombre} ${playerIn.apellido} entra por ${playerOut.nombre} ${playerOut.apellido}`,
     };
-  });
+  }, { timeout: 10000 });
 };
 
 export const recordShot = async (
@@ -954,6 +1091,12 @@ export const recordShot = async (
     if (game.estado !== "in_progress") {
       throw new Error(
         "No se pueden registrar estadísticas cuando el juego no está en progreso"
+      );
+    }
+
+    if (!game.isClockRunning) {
+      throw new Error(
+        "No se pueden registrar estadísticas mientras el reloj está pausado"
       );
     }
 
@@ -1225,6 +1368,12 @@ export const recordRebound = async (gameId, playerId) => {
     );
   }
 
+  if (!game.isClockRunning) {
+    throw new Error(
+      "No se pueden registrar estadísticas mientras el reloj está pausado"
+    );
+  }
+
   // Check if player is on the court (in active players)
   const isPlayerActive = game.activePlayers.some(
     (p) => p.id === Number(playerId)
@@ -1296,6 +1445,12 @@ export const recordAssist = async (gameId, playerId) => {
   if (game.estado !== "in_progress") {
     throw new Error(
       "No se pueden registrar estadísticas cuando el juego no está en progreso"
+    );
+  }
+
+  if (!game.isClockRunning) {
+    throw new Error(
+      "No se pueden registrar estadísticas mientras el reloj está pausado"
     );
   }
 
@@ -1373,6 +1528,12 @@ export const recordSteal = async (gameId, playerId) => {
     );
   }
 
+  if (!game.isClockRunning) {
+    throw new Error(
+      "No se pueden registrar estadísticas mientras el reloj está pausado"
+    );
+  }
+
   // Validate that the player is currently active (not on bench)
   const isPlayerActive = game.activePlayers.some(
     (p) => p.id === Number(playerId)
@@ -1444,6 +1605,12 @@ export const recordBlock = async (gameId, playerId) => {
   if (game.estado !== "in_progress") {
     throw new Error(
       "No se pueden registrar estadísticas cuando el juego no está en progreso"
+    );
+  }
+
+  if (!game.isClockRunning) {
+    throw new Error(
+      "No se pueden registrar estadísticas mientras el reloj está pausado"
     );
   }
 
@@ -1524,12 +1691,16 @@ export const nextQuarter = async (gameId) => {
       include: {
         teamHome: true,
         teamAway: true,
+        activePlayers: true,
       },
     });
 
     if (!game) {
       throw new Error("Juego no encontrado");
     }
+
+    // Credit any in-progress stint before the quarter/game state changes under it
+    await flushClockTime(tx, game);
 
     const nextQuarterNum = game.currentQuarter + 1;
     let gameStatus = game.estado;
@@ -1550,6 +1721,8 @@ export const nextQuarter = async (gameId) => {
             where: { id: Number(gameId) },
             data: {
               estado: gameStatus,
+              isClockRunning: false,
+              clockStartedAt: null,
             },
             include: {
               teamHome: true,
@@ -1582,6 +1755,8 @@ export const nextQuarter = async (gameId) => {
             where: { id: Number(gameId) },
             data: {
               estado: gameStatus,
+              isClockRunning: false,
+              clockStartedAt: null,
             },
             include: {
               teamHome: true,
@@ -1601,14 +1776,18 @@ export const nextQuarter = async (gameId) => {
       }
     }
 
-    // Move to next quarter/overtime
+    // Move to next quarter/overtime. The clock always starts paused for the new
+    // quarter — whoever controls time must explicitly resume it.
     const updatedGame = await tx.game.update({
       where: { id: Number(gameId) },
       data: {
         currentQuarter: nextQuarterNum,
         quarterTime: 0,
+        gameTime: 0,
         isOvertime: isOvertime,
         estado: gameStatus,
+        isClockRunning: false,
+        clockStartedAt: null,
       },
       include: {
         teamHome: true,
@@ -1623,7 +1802,7 @@ export const nextQuarter = async (gameId) => {
         : `Cuarto ${nextQuarterNum}`,
       gameEnded: false,
     };
-  });
+  }, { timeout: 10000 });
 };
 
 export const updateQuarterTime = async (gameId, quarterTime) => {
@@ -1653,6 +1832,12 @@ export const recordTurnover = async (gameId, playerId) => {
   if (game.estado !== "in_progress") {
     throw new Error(
       "No se pueden registrar estadísticas cuando el juego no está en progreso"
+    );
+  }
+
+  if (!game.isClockRunning) {
+    throw new Error(
+      "No se pueden registrar estadísticas mientras el reloj está pausado"
     );
   }
 
@@ -1728,6 +1913,12 @@ export const recordPersonalFoul = async (gameId, playerId) => {
     if (game.estado !== "in_progress") {
       throw new Error(
         "No se pueden registrar estadísticas cuando el juego no está en progreso"
+      );
+    }
+
+    if (!game.isClockRunning) {
+      throw new Error(
+        "No se pueden registrar estadísticas mientras el reloj está pausado"
       );
     }
 
