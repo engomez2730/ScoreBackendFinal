@@ -876,6 +876,22 @@ export const makeSubstitution = async (
       throw new Error("El jugador que entra ya está en la cancha");
     }
 
+    // FIBA rule: a player disqualified at 5 personal fouls can't re-enter the game
+    const playerInStats = await tx.playerGameStats.findUnique({
+      where: {
+        gameId_playerId: {
+          gameId: Number(gameId),
+          playerId: Number(playerInId),
+        },
+      },
+    });
+
+    if (playerInStats && playerInStats.faltasPersonales >= 5) {
+      throw new Error(
+        `${playerIn.nombre} ${playerIn.apellido} tiene ${playerInStats.faltasPersonales} faltas personales y está descalificado. No puede volver a la cancha.`
+      );
+    }
+
     // Record substitution
     const substitution = await tx.substitution.create({
       data: {
@@ -1716,6 +1732,24 @@ export const recordPersonalFoul = async (gameId, playerId) => {
     }
 
     // Note: Players can commit fouls even when on the bench, so we don't check if they're active
+
+    // FIBA rule: a player is disqualified (fouled out) at 5 personal fouls and
+    // cannot be charged with any more after that.
+    const FOUL_OUT_LIMIT = 5;
+    const existingStats = await tx.playerGameStats.findUnique({
+      where: {
+        gameId_playerId: {
+          gameId: Number(gameId),
+          playerId: Number(playerId),
+        },
+      },
+    });
+
+    if (existingStats && existingStats.faltasPersonales >= FOUL_OUT_LIMIT) {
+      throw new Error(
+        `El jugador ya tiene ${existingStats.faltasPersonales} faltas personales y está descalificado. No se pueden registrar más faltas.`
+      );
+    }
 
     // Determine which quarter we're in for fouls tracking
     let quarterFoulsField = '';
