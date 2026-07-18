@@ -2141,34 +2141,31 @@ export const startGame = async (gameId, activePlayerIds, gameSettings) => {
       },
     });
 
-    // Initialize player stats for active players
-    for (const playerId of activePlayerIds) {
-      await tx.playerGameStats.upsert({
-        where: {
-          gameId_playerId: {
-            gameId: Number(gameId),
-            playerId: Number(playerId),
-          },
-        },
-        update: {},
-        create: {
-          gameId: Number(gameId),
-          playerId: Number(playerId),
-          puntos: 0,
-          rebotes: 0,
-          asistencias: 0,
-          robos: 0,
-          tapones: 0,
-          tirosIntentados: 0,
-          tirosAnotados: 0,
-          tiros3Intentados: 0,
-          tiros3Anotados: 0,
-          minutos: 0,
-          plusMinus: 0,
-          perdidas: 0,
-        },
-      });
-    }
+    // Initialize player stats for active players. One bulk insert instead of
+    // one upsert per player — with 10 starters that was 10 sequential
+    // round-trips to a remote DB inside one transaction, which was
+    // intermittently blowing Prisma's 5s default timeout. skipDuplicates
+    // preserves the original upsert's no-op-on-existing-row behavior (e.g.
+    // when re-starting a game that already has stats rows).
+    await tx.playerGameStats.createMany({
+      data: activePlayerIds.map((playerId) => ({
+        gameId: Number(gameId),
+        playerId: Number(playerId),
+        puntos: 0,
+        rebotes: 0,
+        asistencias: 0,
+        robos: 0,
+        tapones: 0,
+        tirosIntentados: 0,
+        tirosAnotados: 0,
+        tiros3Intentados: 0,
+        tiros3Anotados: 0,
+        minutos: 0,
+        plusMinus: 0,
+        perdidas: 0,
+      })),
+      skipDuplicates: true,
+    });
 
     // Separate players for logging
     const homePlayers = activePlayerIds.slice(0, 5);
@@ -2194,5 +2191,5 @@ export const startGame = async (gameId, activePlayerIds, gameSettings) => {
         overtimeLength: updatedGame.overtimeLength,
       },
     };
-  });
+  }, { timeout: 10000 });
 };
