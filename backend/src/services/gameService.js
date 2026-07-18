@@ -1066,14 +1066,7 @@ export const makeSubstitution = async (
   }, { timeout: 10000 });
 };
 
-export const recordShot = async (
-  gameId,
-  playerId,
-  shotType,
-  made,
-  gameTime,
-  playerMinutes
-) => {
+export const recordShot = async (gameId, playerId, shotType, made) => {
   return prisma.$transaction(async (tx) => {
     // Get game with active players to validate
     const game = await tx.game.findUnique({
@@ -1111,11 +1104,9 @@ export const recordShot = async (
       );
     }
 
-    // Update game time first
-    await tx.game.update({
-      where: { id: Number(gameId) },
-      data: { gameTime: Number(gameTime) },
-    });
+    // game.gameTime is exclusively owned by startClock/pauseClock/substitutions/
+    // nextQuarter now — a client-supplied value here would fight with
+    // clockStartedAt and corrupt the elapsed-time math on every shot.
 
     // Calculate points based on shot type and determine quarter points
     let points = 0;
@@ -2106,6 +2097,8 @@ export const startGame = async (gameId, activePlayerIds, gameSettings) => {
       quarterTime: 0,
       gameTime: 0,
       isOvertime: false,
+      isClockRunning: false,
+      clockStartedAt: null,
       activePlayers: {
         set: activePlayerIds.map((id) => ({ id: Number(id) })),
       },

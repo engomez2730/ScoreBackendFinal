@@ -463,20 +463,13 @@ export const makeSubstitution = async (req, res) => {
 };
 
 export const recordShot = async (req, res) => {
-  const { playerId, shotType, made, gameTime, playersOnCourt } = req.body;
-  if (gameTime === undefined) {
-    return res
-      .status(400)
-      .json({ error: "Se requiere el tiempo actual del juego (gameTime)" });
-  }
+  const { playerId, shotType, made } = req.body;
   try {
     const result = await gameService.recordShot(
       req.params.id,
       playerId,
       shotType,
-      made,
-      gameTime,
-      playersOnCourt
+      made
     );
     io.to(`game_${req.params.id}`).emit("statsUpdated", {
       gameId: req.params.id,
