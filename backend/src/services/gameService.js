@@ -1118,7 +1118,11 @@ export const recordShot = async (gameId, playerId, shotType, made) => {
       );
     }
 
-    if (!game.isClockRunning) {
+    // Free throws happen on a dead ball (the clock is stopped in real
+    // basketball while they're shot), so only field goals require the clock
+    // to actually be running.
+    const isFreeThrow = shotType === "ft" || shotType === "free_throw";
+    if (!isFreeThrow && !game.isClockRunning) {
       throw new Error(
         "No se pueden registrar estadísticas mientras el reloj está pausado"
       );
@@ -1907,11 +1911,8 @@ export const recordPersonalFoul = async (gameId, playerId) => {
       );
     }
 
-    if (!game.isClockRunning) {
-      throw new Error(
-        "No se pueden registrar estadísticas mientras el reloj está pausado"
-      );
-    }
+    // Fouls are called on a dead ball, so unlike other stats they can be
+    // recorded whether the clock is running or paused.
 
     // Note: Players can commit fouls even when on the bench, so we don't check if they're active
 
@@ -2088,6 +2089,27 @@ export const startGame = async (gameId, activePlayerIds, gameSettings) => {
 
     if (invalidPlayers.length > 0) {
       throw new Error(`Jugadores inválidos: ${invalidPlayers.join(", ")}`);
+    }
+
+    // FIBA rule: a player already disqualified at 5 personal fouls in this
+    // game can't be selected into the starting five (e.g. reconfiguring the
+    // lineup for a game that already has some history).
+    const disqualifiedStats = await tx.playerGameStats.findMany({
+      where: {
+        gameId: Number(gameId),
+        playerId: { in: activePlayerIds.map((id) => Number(id)) },
+        faltasPersonales: { gte: 5 },
+      },
+    });
+
+    if (disqualifiedStats.length > 0) {
+      const disqualifiedNames = disqualifiedStats.map((stat) => {
+        const p = allTeamPlayers.find((tp) => tp.id === stat.playerId);
+        return p ? `${p.nombre} ${p.apellido}` : `#${stat.playerId}`;
+      });
+      throw new Error(
+        `No se puede iniciar: ${disqualifiedNames.join(", ")} ya tiene 5 faltas personales y está descalificado.`
+      );
     }
 
     // Update game settings if provided
