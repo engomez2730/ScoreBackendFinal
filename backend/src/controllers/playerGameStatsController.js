@@ -1,6 +1,5 @@
 import * as statsService from "../services/playerGameStatsService.js";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import prisma from "../lib/prisma.js";
 
 export const getStatsByGame = async (req, res) => {
   const stats = await statsService.getStatsByGame(req.params.gameId);

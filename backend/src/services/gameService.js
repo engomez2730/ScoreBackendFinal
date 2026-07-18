@@ -44,8 +44,7 @@ export const fullUpdateGame = async (
     };
   });
 };
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import prisma from "../lib/prisma.js";
 
 export const getAllGames = async () => {
   return prisma.game.findMany({

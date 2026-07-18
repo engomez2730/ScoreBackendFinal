@@ -1,5 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import prisma from "../lib/prisma.js";
 
 export const getAllEvents = async () => {
   return prisma.event.findMany({ include: { games: true } });

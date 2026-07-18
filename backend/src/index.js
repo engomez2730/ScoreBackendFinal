@@ -8,7 +8,7 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
-import { PrismaClient } from "@prisma/client";
+import prisma from "./lib/prisma.js";
 import playersRouter from "./routes/players.js";
 import teamsRouter from "./routes/teams.js";
 import eventsRouter from "./routes/events.js";
@@ -22,8 +22,6 @@ const io = new Server(server, {
     methods: ["GET", "POST", "PUT", "DELETE"],
   },
 });
-
-const prisma = new PrismaClient();
 
 // Export io for use in controllers
 export { io };

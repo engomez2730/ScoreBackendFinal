@@ -1,5 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import prisma from "../lib/prisma.js";
 
 export const getSubstitutionsByGame = async (gameId) => {
   return prisma.substitution.findMany({
