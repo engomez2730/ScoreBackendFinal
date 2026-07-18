@@ -1013,6 +1013,32 @@ export const makeSubstitution = async (
       );
     }
 
+    // Guarantee playerIn has a stats row before they can take the court, so
+    // recordShot's plus-minus update never has to check for (and lazily
+    // create) missing rows on every single shot.
+    if (!playerInStats) {
+      await tx.playerGameStats.create({
+        data: {
+          gameId: Number(gameId),
+          playerId: Number(playerInId),
+          puntos: 0,
+          rebotes: 0,
+          asistencias: 0,
+          robos: 0,
+          tapones: 0,
+          tirosIntentados: 0,
+          tirosAnotados: 0,
+          tiros3Intentados: 0,
+          tiros3Anotados: 0,
+          tirosLibresIntentados: 0,
+          tirosLibresAnotados: 0,
+          minutos: 0,
+          plusMinus: 0,
+          perdidas: 0,
+        },
+      });
+    }
+
     // Checkpoint the elapsed clock time onto the CURRENT lineup before it
     // changes. Without this, a stint that spans a substitution would credit
     // the whole elapsed time to whoever happens to be active when the clock
@@ -1067,11 +1093,17 @@ export const makeSubstitution = async (
 
 export const recordShot = async (gameId, playerId, shotType, made) => {
   return prisma.$transaction(async (tx) => {
-    // Get game with active players to validate
+    // Pull teams and active players in this same fetch — recordShot needs
+    // them later to attribute the score/plus-minus and name the player, and
+    // re-fetching them again further down was three extra round-trips to a
+    // DB that's slow enough per-query that it was the actual reason
+    // recording a shot took several seconds.
     const game = await tx.game.findUnique({
       where: { id: Number(gameId) },
       include: {
         activePlayers: true,
+        teamHome: true,
+        teamAway: true,
       },
     });
 
@@ -1093,11 +1125,11 @@ export const recordShot = async (gameId, playerId, shotType, made) => {
     }
 
     // Check if player is on the court (in active players)
-    const isPlayerActive = game.activePlayers.some(
+    const shootingPlayer = game.activePlayers.find(
       (p) => p.id === Number(playerId)
     );
 
-    if (!isPlayerActive) {
+    if (!shootingPlayer) {
       throw new Error(
         "No se pueden registrar estadísticas para jugadores que están en el banquillo"
       );
@@ -1211,29 +1243,13 @@ export const recordShot = async (gameId, playerId, shotType, made) => {
     // Update game score if shot was made
     let updatedGame = null;
     if (made && points > 0) {
-      const gameWithTeams = await tx.game.findUnique({
-        where: { id: Number(gameId) },
-        include: {
-          teamHome: { include: { players: true } },
-          teamAway: { include: { players: true } },
-          activePlayers: true
-        },
-      });
-
-      // Determine which team scored
-      const isHomeTeam = gameWithTeams.teamHome.players.some(
-        (p) => p.id === Number(playerId)
-      );
+      const isHomeTeam = shootingPlayer.teamId === game.teamHomeId;
 
       updatedGame = await tx.game.update({
         where: { id: Number(gameId) },
         data: {
-          homeScore: isHomeTeam ? gameWithTeams.homeScore + points : gameWithTeams.homeScore,
-          awayScore: !isHomeTeam ? gameWithTeams.awayScore + points : gameWithTeams.awayScore,
-        },
-        include: {
-          teamHome: true,
-          teamAway: true,
+          homeScore: isHomeTeam ? game.homeScore + points : game.homeScore,
+          awayScore: !isHomeTeam ? game.awayScore + points : game.awayScore,
         },
       });
 
@@ -1241,11 +1257,16 @@ export const recordShot = async (gameId, playerId, shotType, made) => {
       // (one query per side) instead of one upsert per active player — with
       // 10 players on court that was 10 sequential round-trips to a remote
       // DB inside one transaction, easily blowing Prisma's 5s timeout.
-      const shooterTeamId = isHomeTeam ? gameWithTeams.teamHomeId : gameWithTeams.teamAwayId;
-      const sameTeamIds = gameWithTeams.activePlayers
+      //
+      // No missing-stats-row fallback here anymore: makeSubstitution now
+      // guarantees an incoming player already has a PlayerGameStats row
+      // before they can be on the court, so every active player is
+      // guaranteed to already have one by the time a shot happens.
+      const shooterTeamId = isHomeTeam ? game.teamHomeId : game.teamAwayId;
+      const sameTeamIds = game.activePlayers
         .filter((p) => p.teamId === shooterTeamId)
         .map((p) => p.id);
-      const opposingTeamIds = gameWithTeams.activePlayers
+      const opposingTeamIds = game.activePlayers
         .filter((p) => p.teamId !== shooterTeamId)
         .map((p) => p.id);
 
@@ -1261,59 +1282,21 @@ export const recordShot = async (gameId, playerId, shotType, made) => {
           data: { plusMinus: { increment: -points } },
         });
       }
-
-      // Rare path: an active player who's never had a stats row created yet.
-      // updateMany silently skips rows that don't exist.
-      const allActiveIds = gameWithTeams.activePlayers.map((p) => p.id);
-      const existingStats = await tx.playerGameStats.findMany({
-        where: { gameId: Number(gameId), playerId: { in: allActiveIds } },
-        select: { playerId: true },
-      });
-      const existingIds = new Set(existingStats.map((s) => s.playerId));
-      const missingPlayers = gameWithTeams.activePlayers.filter(
-        (p) => !existingIds.has(p.id)
-      );
-
-      for (const missingPlayer of missingPlayers) {
-        const plusMinusChange =
-          missingPlayer.teamId === shooterTeamId ? points : -points;
-        await tx.playerGameStats.create({
-          data: {
-            gameId: Number(gameId),
-            playerId: missingPlayer.id,
-            puntos: 0,
-            rebotes: 0,
-            asistencias: 0,
-            robos: 0,
-            tapones: 0,
-            tirosIntentados: 0,
-            tirosAnotados: 0,
-            tiros3Intentados: 0,
-            tiros3Anotados: 0,
-            tirosLibresIntentados: 0,
-            tirosLibresAnotados: 0,
-            minutos: 0,
-            plusMinus: plusMinusChange,
-            perdidas: 0,
-          },
-        });
-      }
     }
 
-    // Get player info for response
-    const player = await tx.player.findUnique({
-      where: { id: Number(playerId) },
-      include: { team: true },
-    });
+    const shooterTeamName =
+      shootingPlayer.teamId === game.teamHomeId
+        ? game.teamHome.nombre
+        : game.teamAway.nombre;
 
     return {
       success: true,
       shot: {
         player: {
-          id: player.id,
-          name: `${player.nombre} ${player.apellido}`,
-          number: player.numero,
-          team: player.team.nombre,
+          id: shootingPlayer.id,
+          name: `${shootingPlayer.nombre} ${shootingPlayer.apellido}`,
+          number: shootingPlayer.numero,
+          team: shooterTeamName,
         },
         shotType: shotType,
         made: made,
@@ -1325,8 +1308,8 @@ export const recordShot = async (gameId, playerId, shotType, made) => {
         ? {
             homeScore: updatedGame.homeScore,
             awayScore: updatedGame.awayScore,
-            homeTeam: updatedGame.teamHome.nombre,
-            awayTeam: updatedGame.teamAway.nombre,
+            homeTeam: game.teamHome.nombre,
+            awayTeam: game.teamAway.nombre,
           }
         : null,
     };
