@@ -1238,32 +1238,50 @@ export const recordShot = async (gameId, playerId, shotType, made) => {
         },
       });
 
-      // Update plus/minus for all players currently on court
-      console.log('Updating plus/minus for active players:', gameWithTeams.activePlayers.length);
-      
-      for (const courtPlayer of gameWithTeams.activePlayers) {
-        // If player is on the same team as the shooter, they get +points
-        // If player is on the opposing team, they get -points
-        const shooterTeamId = isHomeTeam ? gameWithTeams.teamHomeId : gameWithTeams.teamAwayId;
-        const isSameTeam = courtPlayer.teamId === shooterTeamId;
-        const plusMinusChange = isSameTeam ? points : -points;
+      // Update plus/minus for all players currently on court. Bulk updateMany
+      // (one query per side) instead of one upsert per active player — with
+      // 10 players on court that was 10 sequential round-trips to a remote
+      // DB inside one transaction, easily blowing Prisma's 5s timeout.
+      const shooterTeamId = isHomeTeam ? gameWithTeams.teamHomeId : gameWithTeams.teamAwayId;
+      const sameTeamIds = gameWithTeams.activePlayers
+        .filter((p) => p.teamId === shooterTeamId)
+        .map((p) => p.id);
+      const opposingTeamIds = gameWithTeams.activePlayers
+        .filter((p) => p.teamId !== shooterTeamId)
+        .map((p) => p.id);
 
-        console.log(`Player ${courtPlayer.id}: ${isSameTeam ? 'same team' : 'opposing team'}, plusMinus change: ${plusMinusChange}`);
+      if (sameTeamIds.length > 0) {
+        await tx.playerGameStats.updateMany({
+          where: { gameId: Number(gameId), playerId: { in: sameTeamIds } },
+          data: { plusMinus: { increment: points } },
+        });
+      }
+      if (opposingTeamIds.length > 0) {
+        await tx.playerGameStats.updateMany({
+          where: { gameId: Number(gameId), playerId: { in: opposingTeamIds } },
+          data: { plusMinus: { increment: -points } },
+        });
+      }
 
-        // Update the player's plus/minus
-        await tx.playerGameStats.upsert({
-          where: {
-            gameId_playerId: {
-              gameId: Number(gameId),
-              playerId: courtPlayer.id,
-            },
-          },
-          update: {
-            plusMinus: { increment: plusMinusChange },
-          },
-          create: {
+      // Rare path: an active player who's never had a stats row created yet.
+      // updateMany silently skips rows that don't exist.
+      const allActiveIds = gameWithTeams.activePlayers.map((p) => p.id);
+      const existingStats = await tx.playerGameStats.findMany({
+        where: { gameId: Number(gameId), playerId: { in: allActiveIds } },
+        select: { playerId: true },
+      });
+      const existingIds = new Set(existingStats.map((s) => s.playerId));
+      const missingPlayers = gameWithTeams.activePlayers.filter(
+        (p) => !existingIds.has(p.id)
+      );
+
+      for (const missingPlayer of missingPlayers) {
+        const plusMinusChange =
+          missingPlayer.teamId === shooterTeamId ? points : -points;
+        await tx.playerGameStats.create({
+          data: {
             gameId: Number(gameId),
-            playerId: courtPlayer.id,
+            playerId: missingPlayer.id,
             puntos: 0,
             rebotes: 0,
             asistencias: 0,
@@ -1313,7 +1331,7 @@ export const recordShot = async (gameId, playerId, shotType, made) => {
           }
         : null,
     };
-  });
+  }, { timeout: 10000 });
 };
 
 // Helper function to create descriptive shot messages

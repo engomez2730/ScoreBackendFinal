@@ -44,7 +44,11 @@ export const getGames = async (req, res) => {
 export const getGame = async (req, res) => {
   const game = await gameService.getGameById(req.params.id);
   if (!game) return res.status(404).json({ error: "Juego no encontrado" });
-  res.json(game);
+  // serverTime lets the client correct for clock skew against its own
+  // Date.now() when computing live elapsed time off clockStartedAt —
+  // without it, a device whose clock is even a couple seconds off from the
+  // server's sees the countdown jump the instant it starts or resumes.
+  res.json({ ...game, serverTime: new Date().toISOString() });
 };
 
 export const createGame = async (req, res) => {
@@ -151,7 +155,7 @@ export const startClock = async (req, res) => {
       gameTime: game.gameTime,
       timestamp: new Date(),
     });
-    res.json(game);
+    res.json({ ...game, serverTime: new Date().toISOString() });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
