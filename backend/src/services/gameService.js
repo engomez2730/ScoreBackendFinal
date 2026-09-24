@@ -34,7 +34,7 @@ export const fullUpdateGame = async (
             ...rest,
           },
         });
-        updatedStats.push(updated);
+        updatedStats.push(await syncEfficiency(tx, updated));
       }
     }
 
@@ -45,6 +45,7 @@ export const fullUpdateGame = async (
   });
 };
 import prisma from "../lib/prisma.js";
+import { syncEfficiency } from "../lib/efficiency.js";
 
 export const getAllGames = async () => {
   return prisma.game.findMany({
@@ -403,7 +404,7 @@ export const updateScore = async (id, homeScore, awayScore) => {
 };
 
 export const updatePlayerStats = async (gameId, playerId, stats) => {
-  return prisma.playerGameStats.upsert({
+  const updated = await prisma.playerGameStats.upsert({
     where: {
       gameId_playerId: {
         gameId: Number(gameId),
@@ -417,6 +418,7 @@ export const updatePlayerStats = async (gameId, playerId, stats) => {
       ...stats,
     },
   });
+  return syncEfficiency(prisma, updated);
 };
 
 export const updatePlayerMinutes = async (gameId, playerMinutes) => {
@@ -558,6 +560,7 @@ export const getGameStatsWithBreakdown = async (id) => {
     foulsQ3: starters.reduce((sum, s) => sum + s.faltasQ3, 0),
     foulsQ4: starters.reduce((sum, s) => sum + s.faltasQ4, 0),
     foulsOT: starters.reduce((sum, s) => sum + s.faltasOT, 0),
+    efficiency: starters.reduce((sum, s) => sum + s.eficiencia, 0),
     players: starters
   };
 
@@ -579,6 +582,7 @@ export const getGameStatsWithBreakdown = async (id) => {
     foulsQ3: bench.reduce((sum, s) => sum + s.faltasQ3, 0),
     foulsQ4: bench.reduce((sum, s) => sum + s.faltasQ4, 0),
     foulsOT: bench.reduce((sum, s) => sum + s.faltasOT, 0),
+    efficiency: bench.reduce((sum, s) => sum + s.eficiencia, 0),
     players: bench
   };
 
@@ -1233,16 +1237,19 @@ export const recordShot = async (gameId, playerId, shotType, made) => {
     }
 
     // Use upsert to either create or update, preserving existing values
-    const updatedPlayerStats = await tx.playerGameStats.upsert({
-      where: {
-        gameId_playerId: {
-          gameId: Number(gameId),
-          playerId: Number(playerId),
+    const updatedPlayerStats = await syncEfficiency(
+      tx,
+      await tx.playerGameStats.upsert({
+        where: {
+          gameId_playerId: {
+            gameId: Number(gameId),
+            playerId: Number(playerId),
+          },
         },
-      },
-      update: updateData,
-      create: createData,
-    });
+        update: updateData,
+        create: createData,
+      })
+    );
 
     // Update game score if shot was made
     let updatedGame = null;
@@ -1381,7 +1388,7 @@ export const recordRebound = async (gameId, playerId) => {
   }
 
   // Use upsert to either create or update, preserving existing values
-  return prisma.playerGameStats.upsert({
+  const updated = await prisma.playerGameStats.upsert({
     where: {
       gameId_playerId: {
         gameId: Number(gameId),
@@ -1422,6 +1429,7 @@ export const recordRebound = async (gameId, playerId) => {
       puntosOT: 0,
     },
   });
+  return syncEfficiency(prisma, updated);
 };
 
 export const recordAssist = async (gameId, playerId) => {
@@ -1461,7 +1469,7 @@ export const recordAssist = async (gameId, playerId) => {
   }
 
   // Use upsert to either create or update, preserving existing values
-  return prisma.playerGameStats.upsert({
+  const updated = await prisma.playerGameStats.upsert({
     where: {
       gameId_playerId: {
         gameId: Number(gameId),
@@ -1502,6 +1510,7 @@ export const recordAssist = async (gameId, playerId) => {
       puntosOT: 0,
     },
   });
+  return syncEfficiency(prisma, updated);
 };
 
 export const recordSteal = async (gameId, playerId) => {
@@ -1541,7 +1550,7 @@ export const recordSteal = async (gameId, playerId) => {
   }
 
   // Use upsert to either create or update, preserving existing values
-  return prisma.playerGameStats.upsert({
+  const updated = await prisma.playerGameStats.upsert({
     where: {
       gameId_playerId: {
         gameId: Number(gameId),
@@ -1582,6 +1591,7 @@ export const recordSteal = async (gameId, playerId) => {
       puntosOT: 0,
     },
   });
+  return syncEfficiency(prisma, updated);
 };
 
 export const recordBlock = async (gameId, playerId) => {
@@ -1621,7 +1631,7 @@ export const recordBlock = async (gameId, playerId) => {
   }
 
   // Use upsert to either create or update, preserving existing values
-  return prisma.playerGameStats.upsert({
+  const updated = await prisma.playerGameStats.upsert({
     where: {
       gameId_playerId: {
         gameId: Number(gameId),
@@ -1662,6 +1672,7 @@ export const recordBlock = async (gameId, playerId) => {
       puntosOT: 0,
     },
   });
+  return syncEfficiency(prisma, updated);
 };
 
 export const updateGameSettings = async (gameId, settings) => {
@@ -1848,7 +1859,7 @@ export const recordTurnover = async (gameId, playerId) => {
   }
 
   // Use upsert to either create or update, preserving existing values
-  return prisma.playerGameStats.upsert({
+  const updated = await prisma.playerGameStats.upsert({
     where: {
       gameId_playerId: {
         gameId: Number(gameId),
@@ -1889,6 +1900,7 @@ export const recordTurnover = async (gameId, playerId) => {
       puntosOT: 0,
     },
   });
+  return syncEfficiency(prisma, updated);
 };
 
 export const recordPersonalFoul = async (gameId, playerId) => {

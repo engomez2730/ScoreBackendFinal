@@ -13,7 +13,8 @@
     "build": "chmod +x node_modules/.bin/prisma && npx prisma generate",
     "postinstall": "chmod +x node_modules/.bin/prisma 2>/dev/null || true && npx prisma generate || true",
     "prisma": "prisma",
-    "deploy": "npx prisma generate && npx prisma db push"
+    "deploy": "npx prisma generate && npx prisma db push",
+    "backfill:efficiency": "node scripts/backfill-efficiency.js"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",
