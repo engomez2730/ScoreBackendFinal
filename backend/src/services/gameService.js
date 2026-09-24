@@ -45,7 +45,7 @@ export const fullUpdateGame = async (
   });
 };
 import prisma from "../lib/prisma.js";
-import { syncEfficiency } from "../lib/efficiency.js";
+import { calculateEfficiency, syncEfficiency } from "../lib/efficiency.js";
 
 export const getAllGames = async () => {
   return prisma.game.findMany({
@@ -560,7 +560,7 @@ export const getGameStatsWithBreakdown = async (id) => {
     foulsQ3: starters.reduce((sum, s) => sum + s.faltasQ3, 0),
     foulsQ4: starters.reduce((sum, s) => sum + s.faltasQ4, 0),
     foulsOT: starters.reduce((sum, s) => sum + s.faltasOT, 0),
-    efficiency: starters.reduce((sum, s) => sum + s.eficiencia, 0),
+    efficiency: starters.reduce((sum, s) => sum + calculateEfficiency(s), 0),
     players: starters
   };
 
@@ -582,7 +582,7 @@ export const getGameStatsWithBreakdown = async (id) => {
     foulsQ3: bench.reduce((sum, s) => sum + s.faltasQ3, 0),
     foulsQ4: bench.reduce((sum, s) => sum + s.faltasQ4, 0),
     foulsOT: bench.reduce((sum, s) => sum + s.faltasOT, 0),
-    efficiency: bench.reduce((sum, s) => sum + s.eficiencia, 0),
+    efficiency: bench.reduce((sum, s) => sum + calculateEfficiency(s), 0),
     players: bench
   };
 
