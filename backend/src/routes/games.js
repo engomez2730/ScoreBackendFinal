@@ -1,5 +1,6 @@
 import express from "express";
 import * as gameController from "../controllers/gameController.js";
+import * as playerStatsAdjustmentController from "../controllers/playerStatsAdjustmentController.js";
 import {
   authenticateToken,
   optionalAuth,
@@ -131,6 +132,21 @@ router.put(
   authenticateToken,
   checkTimeControlPermission,
   gameController.updatePlayerPlusMinus
+);
+
+// Corrección manual del box score de un jugador (juego en curso o terminado).
+// Reservada a quien gestiona el juego: creador, ADMIN o canManagePermissions.
+router.put(
+  "/:id/players/:playerId/stats",
+  authenticateToken,
+  checkGamePermissions(["canManagePermissions"]),
+  playerStatsAdjustmentController.adjustPlayerStats
+);
+router.get(
+  "/:id/stat-adjustments",
+  authenticateToken,
+  checkGamePermissions(["canManagePermissions"]),
+  playerStatsAdjustmentController.getAdjustmentHistory
 );
 
 // Rutas específicas de estadísticas (con permisos granulares)
